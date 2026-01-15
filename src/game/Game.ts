@@ -438,10 +438,7 @@ export class Game {
       if (ballHitByLaser) {
         const hitBall = ball1 || ball2;
         if (hitBall) {
-          const pos = hitBall.body.translation();
-          const pixelPos = this.physicsWorld.toPixels(pos.x, pos.y);
-          const color = BALL_COLORS[hitBall.type];
-          this.handleLoss(pixelPos.x, pixelPos.y, color);
+          this.handleLoss(hitBall);
         }
       }
     });
@@ -460,10 +457,7 @@ export class Game {
       const y = ball.graphics.position.y;
 
       if (x < bounds.minX || x > bounds.maxX || y > bounds.maxY) {
-        let color = BALL_COLORS.blue;
-        if (this.balls.indexOf(ball) === 1) color = BALL_COLORS.pink;
-
-        this.handleLoss(x, y, color);
+        this.handleLoss(ball);
         return;
       }
     }
@@ -477,24 +471,42 @@ export class Game {
     const clampedY = Math.max(0, Math.min(y, GAME_HEIGHT));
 
     this.effectManager.createRingExplosion(clampedX, clampedY, 0xFFD700, 1);
+    this.effectManager.createParticleExplosion(clampedX, clampedY, 0xFFD700, 'star');
 
     this.autoRestartTimeout = setTimeout(() => {
       this.restartLevel();
     }, 2000);
   }
 
-  private handleLoss(x: number, y: number, color: number): void {
+  private handleLoss(ball: Ball): void {
+    if (!this.balls.includes(ball)) return;
+
     console.log('Game Lost!');
     this.gameState = GameState.LOST;
 
-    const clampedX = Math.max(0, Math.min(x, GAME_WIDTH));
-    const clampedY = Math.max(0, Math.min(y, GAME_HEIGHT));
+    const pos = ball.body.translation();
+    const pixelPos = this.physicsWorld.toPixels(pos.x, pos.y);
+    const color = BALL_COLORS[ball.type];
 
+    // Remove ball
+    ball.destroy(this.physicsWorld);
+    const index = this.balls.indexOf(ball);
+    if (index > -1) this.balls.splice(index, 1);
+    this.ballColliderHandles.delete(ball.getColliderHandle());
+
+    // Calculate clamped position for effects (so they are visible if ball is out of bounds)
+    const clampedX = Math.max(0, Math.min(pixelPos.x, GAME_WIDTH));
+    const clampedY = Math.max(0, Math.min(pixelPos.y, GAME_HEIGHT));
+
+    // Trigger effects
     this.effectManager.createRingExplosion(clampedX, clampedY, color, 1);
+    this.effectManager.createParticleExplosion(clampedX, clampedY, color, 'circle');
 
-    this.autoRestartTimeout = setTimeout(() => {
-      this.restartLevel();
-    }, 2000);
+    if (!this.autoRestartTimeout) {
+      this.autoRestartTimeout = setTimeout(() => {
+        this.restartLevel();
+      }, 2000);
+    }
   }
 
   /**
