@@ -34,12 +34,15 @@ export class FallingObject {
       radius
     } = config;
 
+    // Ignore angle for circles
+    const effectiveAngle = type === 'circle' ? 0 : angle;
+
     // Create Pixi.js graphics
     this.graphics = new PIXI.Graphics();
 
     // Set initial position and rotation
     this.graphics.position.set(x, y);
-    this.graphics.rotation = (angle * Math.PI) / 180;
+    this.graphics.rotation = (effectiveAngle * Math.PI) / 180;
 
     const world = physicsWorld.getWorld();
     const R = physicsWorld.getRAPIER();
@@ -52,7 +55,7 @@ export class FallingObject {
 
     rigidBodyDesc
       .setTranslation(physicsPos.x, physicsPos.y)
-      .setRotation(-(angle * Math.PI) / 180);
+      .setRotation(-(effectiveAngle * Math.PI) / 180);
 
     this.body = world.createRigidBody(rigidBodyDesc);
 

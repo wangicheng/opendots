@@ -32,11 +32,14 @@ export class Obstacle {
       thickness
     } = config;
 
+    // Ignore angle for circles
+    const effectiveAngle = type === 'circle' ? 0 : angle;
+
     // Create Pixi.js graphics
     this.graphics = new PIXI.Graphics();
     // Set position and rotation (Pixi)
     this.graphics.position.set(x, y);
-    this.graphics.rotation = (angle * Math.PI) / 180;
+    this.graphics.rotation = (effectiveAngle * Math.PI) / 180;
 
     const world = physicsWorld.getWorld();
     const R = physicsWorld.getRAPIER();
@@ -45,7 +48,7 @@ export class Obstacle {
     const physicsPos = physicsWorld.toPhysics(x, y);
     const rigidBodyDesc = R.RigidBodyDesc.fixed()
       .setTranslation(physicsPos.x, physicsPos.y)
-      .setRotation(-(angle * Math.PI) / 180);
+      .setRotation(-(effectiveAngle * Math.PI) / 180);
 
     this.body = world.createRigidBody(rigidBodyDesc);
 

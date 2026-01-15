@@ -35,7 +35,7 @@ export interface NetConfig {
   y: number;
   width: number;
   height: number;
-  rotation?: number; // Degrees
+  angle?: number; // Degrees
 }
 
 export interface FallingObjectConfig {
@@ -54,7 +54,7 @@ export interface IceBlockConfig {
   width: number;
   height: number;
   meltTime?: 1 | 2 | 3; // Default: 1 second
-  rotation?: number; // Degrees
+  angle?: number; // Degrees
 }
 
 export interface LevelData {

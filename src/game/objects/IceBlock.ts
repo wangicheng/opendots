@@ -32,7 +32,7 @@ export class IceBlock {
     this.width = config.width;
     this.height = config.height;
 
-    const { x, y, width, height, rotation = 0 } = config;
+    const { x, y, width, height, angle = 0 } = config;
 
     // Create Pixi.js graphics
     this.graphics = new PIXI.Graphics();
@@ -40,7 +40,7 @@ export class IceBlock {
 
     // Set position and rotation
     this.graphics.position.set(x, y);
-    this.graphics.rotation = (rotation * Math.PI) / 180;
+    this.graphics.rotation = (angle * Math.PI) / 180;
 
     // Create physics body
     const world = physicsWorld.getWorld();
@@ -49,7 +49,7 @@ export class IceBlock {
     const physicsPos = physicsWorld.toPhysics(x, y);
     const rigidBodyDesc = R.RigidBodyDesc.fixed()
       .setTranslation(physicsPos.x, physicsPos.y)
-      .setRotation(-(rotation * Math.PI) / 180);
+      .setRotation(-(angle * Math.PI) / 180);
 
     this.body = world.createRigidBody(rigidBodyDesc);
 

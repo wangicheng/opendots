@@ -76,7 +76,7 @@ export const COLLISION_GROUP = {
   GROUND: 0x0010_FFFF,          // Group 4, collides with all
   OBSTACLE: 0x0020_FFFF,        // Group 5, collides with all
   FALLING_OBJECT: 0x0040_FFFF,  // Group 6, collides with all
-  NET: 0x0080_0000,             // Group 7, collides with nothing (sensor only)
+  NET: 0x0080_FFFF,             // Group 7, sensor that detects everything (so queries can find it)
   ICE_BLOCK: 0x0100_FFFF,       // Group 8, collides with all (for detection)
 };
 

@@ -22,6 +22,7 @@ import {
   GRID_COLOR,
   BALL_COLORS,
   BALL_RADIUS,
+  COLLISION_GROUP,
 } from './config';
 import { EffectManager } from './effects/EffectManager';
 
@@ -176,7 +177,7 @@ export class Game {
     // Spawn Nets
     if (levelData.nets) {
       for (const netConfig of levelData.nets) {
-        const net = new Net(netConfig);
+        const net = new Net(this.physicsWorld, netConfig);
         this.nets.push(net);
         this.gameContainer.addChild(net.graphics);
       }
@@ -201,9 +202,7 @@ export class Game {
       this.drawingManager.setCollisionProvider({
         isPointValid: (point: Point) => {
           // Check Nets
-          for (const net of this.nets) {
-            if (net.getBounds().contains(point.x, point.y)) return false;
-          }
+          // Net check is now covered by Physics World intersection check below
 
           // Check Physics Objects (Balls, Obstacles, Falling Objects, Lines)
           const physicsPos = this.physicsWorld.toPhysics(point.x, point.y);
@@ -214,8 +213,7 @@ export class Game {
               isHit = true;
               return false;
             },
-            undefined,
-            0xFFFFFFFF
+            COLLISION_GROUP.ALL
           );
           return !isHit;
         },
@@ -261,7 +259,7 @@ export class Game {
 
     // Clear nets
     for (const net of this.nets) {
-      net.destroy();
+      net.destroy(this.physicsWorld);
     }
     this.nets = [];
 
@@ -550,7 +548,7 @@ export class Game {
       const ray = new R.Ray({ x: physP1.x, y: physP1.y }, dir);
 
       // Cast ray against everything
-      const hit = world.castRay(ray, len, true, undefined, 0xFFFFFFFF);
+      const hit = world.castRay(ray, len, true, COLLISION_GROUP.ALL);
 
       if (hit) {
         const hitPoint = ray.pointAt(hit.timeOfImpact); // pointAt returns {x, y}
@@ -564,19 +562,9 @@ export class Game {
       }
     }
 
-    // 2. Check Nets (AABB Intersection)
-    for (const net of this.nets) {
-      const bounds = net.getBounds();
-      // Simple line-rect intersection for AABB
-      const intersection = this.getLineRectIntersection(p1, p2, bounds);
-      if (intersection) {
-        const dist = Math.sqrt((intersection.x - p1.x) ** 2 + (intersection.y - p1.y) ** 2);
-        if (dist < minDist) {
-          minDist = dist;
-          closestIntersection = intersection;
-        }
-      }
-    }
+    // 2. Check Nets is now covered by the Physics World Raycast above
+    // because Net now has a collider in the COLLISION_GROUP.NET
+    // and the raycast mask 0xFFFFFFFF includes it.
 
     return closestIntersection;
   }
@@ -584,50 +572,7 @@ export class Game {
   /**
    * Helper for Line-Rect intersection
    */
-  private getLineRectIntersection(p1: Point, p2: Point, rect: PIXI.Rectangle): Point | null {
-    const left = rect.x;
-    const right = rect.x + rect.width;
-    const top = rect.y;
-    const bottom = rect.y + rect.height;
 
-    // If both outside and not crossing, quick reject?
-    // Actually just check 4 edges.
-
-    const edges = [
-      [{ x: left, y: top }, { x: right, y: top }],
-      [{ x: right, y: top }, { x: right, y: bottom }],
-      [{ x: right, y: bottom }, { x: left, y: bottom }],
-      [{ x: left, y: bottom }, { x: left, y: top }]
-    ];
-
-    let closest: Point | null = null;
-    let minDist = Infinity;
-
-    for (const edge of edges) {
-      const p3 = edge[0];
-      const p4 = edge[1];
-
-      // Line-Line Intersection
-      const den = (p1.x - p2.x) * (p3.y - p4.y) - (p1.y - p2.y) * (p3.x - p4.x);
-      if (den === 0) continue;
-
-      const t = ((p1.x - p3.x) * (p3.y - p4.y) - (p1.y - p3.y) * (p3.x - p4.x)) / den;
-      const u = -((p1.x - p2.x) * (p1.y - p3.y) - (p1.y - p2.y) * (p1.x - p3.x)) / den;
-
-      if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
-        const ix = p1.x + t * (p2.x - p1.x);
-        const iy = p1.y + t * (p2.y - p1.y);
-        const dist = Math.sqrt((ix - p1.x) ** 2 + (iy - p1.y) ** 2);
-
-        if (dist < minDist) {
-          minDist = dist;
-          closest = { x: ix, y: iy };
-        }
-      }
-    }
-
-    return closest;
-  }
 
   /**
    * Get the Pixi.js application
