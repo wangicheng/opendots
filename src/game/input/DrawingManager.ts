@@ -8,6 +8,11 @@ import { distanceSampling } from '../utils/douglasPeucker';
 import type { Point } from '../utils/douglasPeucker';
 import { LINE_COLOR, LINE_WIDTH, LINE_MIN_DISTANCE } from '../config';
 
+export interface CollisionProvider {
+  isPointValid(point: Point): boolean;
+  getIntersection(p1: Point, p2: Point): Point | null;
+}
+
 export class DrawingManager {
   private container: PIXI.Container;
   private currentGraphics: PIXI.Graphics | null = null;
@@ -16,6 +21,7 @@ export class DrawingManager {
   private isDrawing = false;
   private isValidStart = false;
   private onLineComplete: ((points: Point[]) => void) | null = null;
+  private collisionProvider: CollisionProvider | null = null;
 
   constructor(stage: PIXI.Container) {
     this.container = new PIXI.Container();
@@ -47,8 +53,8 @@ export class DrawingManager {
   private onPointerDown(event: PIXI.FederatedPointerEvent): void {
     const startPoint = { x: event.globalX, y: event.globalY };
 
-    // Check if starting point is in restricted area
-    this.isValidStart = !this.isPointInRestrictedArea(startPoint);
+    // Check if starting point is valid
+    this.isValidStart = this.collisionProvider ? this.collisionProvider.isPointValid(startPoint) : true;
 
     this.isDrawing = true;
     this.currentPoints = [];
@@ -67,129 +73,11 @@ export class DrawingManager {
   /**
    * Handle pointer move event
    */
-  private restrictedAreasProvider: (() => PIXI.Rectangle[]) | null = null;
-
   /**
-   * Set restricted areas provider
+   * Set collision provider
    */
-  setRestrictedAreasProvider(provider: () => PIXI.Rectangle[]): void {
-    this.restrictedAreasProvider = provider;
-  }
-
-  /**
-   * Check if a point is in a restricted area
-   */
-  private isPointInRestrictedArea(point: Point): boolean {
-    if (!this.restrictedAreasProvider) return false;
-
-    const areas = this.restrictedAreasProvider();
-    for (const area of areas) {
-      if (area.contains(point.x, point.y)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /**
-   * Check if a line segment intersects with any restricted area
-   */
-  private intersectsRestrictedArea(p1: Point, p2: Point): boolean {
-    if (!this.restrictedAreasProvider) return false;
-
-    const areas = this.restrictedAreasProvider();
-    for (const area of areas) {
-      // Check if either point is inside (simple check)
-      if (area.contains(p1.x, p1.y) || area.contains(p2.x, p2.y)) {
-        return true;
-      }
-
-      // Check line intersection with rectangle edges
-      // Cohen-Sutherland or simple line-line intersection for 4 edges
-      // Simpler approach: check intersection with each of the 4 lines of the rect
-      const left = area.x;
-      const right = area.x + area.width;
-      const top = area.y;
-      const bottom = area.y + area.height;
-
-      const lines = [
-        [{ x: left, y: top }, { x: right, y: top }],       // Top
-        [{ x: right, y: top }, { x: right, y: bottom }],   // Right
-        [{ x: right, y: bottom }, { x: left, y: bottom }], // Bottom
-        [{ x: left, y: bottom }, { x: left, y: top }]      // Left
-      ];
-
-      for (const edge of lines) {
-        if (this.lineIntersectsLine(p1, p2, edge[0], edge[1])) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
-  /**
-   * Line-line intersection helper
-   */
-  private lineIntersectsLine(p1: Point, p2: Point, p3: Point, p4: Point): boolean {
-    const ccw = (a: Point, b: Point, c: Point) => {
-      return (c.y - a.y) * (b.x - a.x) > (b.y - a.y) * (c.x - a.x);
-    };
-    return (ccw(p1, p3, p4) != ccw(p2, p3, p4)) && (ccw(p1, p2, p3) != ccw(p1, p2, p4));
-  }
-
-  /**
-   * Get the closest intersection point with restricted areas
-   */
-  private getClosestIntersection(p1: Point, p2: Point): Point | null {
-    if (!this.restrictedAreasProvider) return null;
-
-    let closestIntersection: Point | null = null;
-    let minDistance = Infinity;
-
-    const areas = this.restrictedAreasProvider();
-    for (const area of areas) {
-      // If we are strictly inside, we are already invalid.
-      // But we might want to find the exit if p1 was inside?
-      // Assuming p1 is always outside or on edge.
-
-      const left = area.x;
-      const right = area.x + area.width;
-      const top = area.y;
-      const bottom = area.y + area.height;
-
-      const lines = [
-        [{ x: left, y: top }, { x: right, y: top }],       // Top
-        [{ x: right, y: top }, { x: right, y: bottom }],   // Right
-        [{ x: right, y: bottom }, { x: left, y: bottom }], // Bottom
-        [{ x: left, y: bottom }, { x: left, y: top }]      // Left
-      ];
-
-      for (const edge of lines) {
-        const p3 = edge[0];
-        const p4 = edge[1];
-
-        // Denominator for line intersection
-        const den = (p1.x - p2.x) * (p3.y - p4.y) - (p1.y - p2.y) * (p3.x - p4.x);
-        if (den === 0) continue; // Parallel
-
-        const t = ((p1.x - p3.x) * (p3.y - p4.y) - (p1.y - p3.y) * (p3.x - p4.x)) / den;
-        const u = -((p1.x - p2.x) * (p1.y - p3.y) - (p1.y - p2.y) * (p1.x - p3.x)) / den;
-
-        if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
-          const intersectX = p1.x + t * (p2.x - p1.x);
-          const intersectY = p1.y + t * (p2.y - p1.y);
-          const dist = Math.sqrt((intersectX - p1.x) ** 2 + (intersectY - p1.y) ** 2);
-
-          if (dist < minDistance) {
-            minDistance = dist;
-            closestIntersection = { x: intersectX, y: intersectY };
-          }
-        }
-      }
-    }
-
-    return closestIntersection;
+  setCollisionProvider(provider: CollisionProvider): void {
+    this.collisionProvider = provider;
   }
 
   /**
@@ -210,9 +98,9 @@ export class DrawingManager {
       return;
     }
 
-    // Check if we hit a restricted area
-    if (this.intersectsRestrictedArea(lastPoint, point)) {
-      const intersection = this.getClosestIntersection(lastPoint, point);
+    // Check for collision
+    if (this.collisionProvider) {
+      const intersection = this.collisionProvider.getIntersection(lastPoint, point);
 
       if (intersection) {
         const dx = intersection.x - lastPoint.x;
@@ -230,12 +118,12 @@ export class DrawingManager {
             this.currentPoints.push({ x: newX, y: newY });
           }
         }
-      }
 
-      // We hit a wall, so we stop here. 
-      // We redraw the confirmed line AND the ghost line to the cursor so the user sees where they are pointing
-      this.redrawCurrentLine(point);
-      return;
+        // We hit something, so we stop here. 
+        // We redraw the confirmed line AND the ghost line to the cursor so the user sees where they are pointing
+        this.redrawCurrentLine(point);
+        return;
+      }
     }
 
     const dx = point.x - lastPoint.x;

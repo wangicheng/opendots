@@ -179,21 +179,36 @@ export class Game {
       }
     }
 
-    // Update DrawingManager with restricted bounds provider
+    // Force update of physics query acceleration structures
+    // This is necessary because the game loop hasn't started stepping the world yet
+    this.physicsWorld.getWorld().updateSceneQueries();
+
+    // Update DrawingManager with collision provider
     if (this.drawingManager) {
-      this.drawingManager.setRestrictedAreasProvider(() => {
-        const restrictedBounds: PIXI.Rectangle[] = [];
+      this.drawingManager.setCollisionProvider({
+        isPointValid: (point: Point) => {
+          // Check Nets
+          for (const net of this.nets) {
+            if (net.getBounds().contains(point.x, point.y)) return false;
+          }
 
-        // Nets (Static)
-        this.nets.forEach(net => restrictedBounds.push(net.getBounds()));
-
-        // Balls (Dynamic)
-        this.balls.forEach(ball => restrictedBounds.push(ball.getBounds()));
-
-        // Obstacles (Static)
-        this.obstacles.forEach(obs => restrictedBounds.push(obs.getBounds()));
-
-        return restrictedBounds;
+          // Check Physics Objects (Balls, Obstacles, Falling Objects, Lines)
+          const physicsPos = this.physicsWorld.toPhysics(point.x, point.y);
+          let isHit = false;
+          this.physicsWorld.getWorld().intersectionsWithPoint(
+            physicsPos,
+            () => {
+              isHit = true;
+              return false;
+            },
+            undefined,
+            0xFFFFFFFF
+          );
+          return !isHit;
+        },
+        getIntersection: (p1: Point, p2: Point): Point | null => {
+          return this.checkIntersection(p1, p2);
+        }
       });
     }
   }
@@ -237,7 +252,10 @@ export class Game {
     }
     this.nets = [];
     if (this.drawingManager) {
-      this.drawingManager.setRestrictedAreasProvider(() => []);
+      this.drawingManager.setCollisionProvider({
+        isPointValid: () => true,
+        getIntersection: () => null
+      });
     }
 
     // Clear drawn lines
@@ -463,6 +481,108 @@ export class Game {
     gridGraphics.stroke({ width: 1, color: GRID_COLOR });
 
     this.gameContainer.addChildAt(gridGraphics, 0);
+  }
+
+  /**
+   * Check intersection for drawing
+   */
+  private checkIntersection(p1: Point, p2: Point): Point | null {
+    let closestIntersection: Point | null = null;
+    let minDist = Infinity;
+
+    // 1. Check Physics World (Raycast)
+    const world = this.physicsWorld.getWorld();
+    const R = this.physicsWorld.getRAPIER();
+
+    const physP1 = this.physicsWorld.toPhysics(p1.x, p1.y);
+    const physP2 = this.physicsWorld.toPhysics(p2.x, p2.y);
+
+    const dx = physP2.x - physP1.x;
+    const dy = physP2.y - physP1.y;
+    const len = Math.sqrt(dx * dx + dy * dy);
+
+    if (len > 0.001) {
+      const dir = { x: dx / len, y: dy / len };
+      const ray = new R.Ray({ x: physP1.x, y: physP1.y }, dir);
+
+      // Cast ray against everything
+      const hit = world.castRay(ray, len, true, undefined, 0xFFFFFFFF);
+
+      if (hit) {
+        const hitPoint = ray.pointAt(hit.timeOfImpact); // pointAt returns {x, y}
+        const pixelHit = this.physicsWorld.toPixels(hitPoint.x, hitPoint.y);
+
+        const dist = Math.sqrt((pixelHit.x - p1.x) ** 2 + (pixelHit.y - p1.y) ** 2);
+        if (dist < minDist) {
+          minDist = dist;
+          closestIntersection = pixelHit;
+        }
+      }
+    }
+
+    // 2. Check Nets (AABB Intersection)
+    for (const net of this.nets) {
+      const bounds = net.getBounds();
+      // Simple line-rect intersection for AABB
+      const intersection = this.getLineRectIntersection(p1, p2, bounds);
+      if (intersection) {
+        const dist = Math.sqrt((intersection.x - p1.x) ** 2 + (intersection.y - p1.y) ** 2);
+        if (dist < minDist) {
+          minDist = dist;
+          closestIntersection = intersection;
+        }
+      }
+    }
+
+    return closestIntersection;
+  }
+
+  /**
+   * Helper for Line-Rect intersection
+   */
+  private getLineRectIntersection(p1: Point, p2: Point, rect: PIXI.Rectangle): Point | null {
+    const left = rect.x;
+    const right = rect.x + rect.width;
+    const top = rect.y;
+    const bottom = rect.y + rect.height;
+
+    // If both outside and not crossing, quick reject?
+    // Actually just check 4 edges.
+
+    const edges = [
+      [{ x: left, y: top }, { x: right, y: top }],
+      [{ x: right, y: top }, { x: right, y: bottom }],
+      [{ x: right, y: bottom }, { x: left, y: bottom }],
+      [{ x: left, y: bottom }, { x: left, y: top }]
+    ];
+
+    let closest: Point | null = null;
+    let minDist = Infinity;
+
+    for (const edge of edges) {
+      const p3 = edge[0];
+      const p4 = edge[1];
+
+      // Line-Line Intersection
+      const den = (p1.x - p2.x) * (p3.y - p4.y) - (p1.y - p2.y) * (p3.x - p4.x);
+      if (den === 0) continue;
+
+      const t = ((p1.x - p3.x) * (p3.y - p4.y) - (p1.y - p3.y) * (p3.x - p4.x)) / den;
+      const u = -((p1.x - p2.x) * (p1.y - p3.y) - (p1.y - p2.y) * (p1.x - p3.x)) / den;
+
+      if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+        const ix = p1.x + t * (p2.x - p1.x);
+        const iy = p1.y + t * (p2.y - p1.y);
+        const dist = Math.sqrt((ix - p1.x) ** 2 + (iy - p1.y) ** 2);
+
+        if (dist < minDist) {
+          minDist = dist;
+          closest = { x: ix, y: iy };
+        }
+      }
+    }
+
+    return closest;
   }
 
   /**
