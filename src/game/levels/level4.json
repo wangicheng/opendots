@@ -6,8 +6,8 @@
       "y": 630
     },
     "pink": {
-      "x": 640,
-      "y": 280
+      "x": 770,
+      "y": 350
     }
   },
   "obstacles": [
@@ -24,35 +24,12 @@
       "width": 1280,
       "height": 10,
       "angle": 0
-    },
-    {
-      "x": 800,
-      "y": 420,
-      "width": 100,
-      "height": 100,
-      "angle": 0
-    }
-  ],
-  "fallingObjects": [
-    {
-      "x": 360,
-      "y": -100,
-      "width": 200,
-      "height": 100,
-      "angle": 0
     }
   ],
   "seesaws": [
     {
       "x": 640,
       "y": 340,
-      "width": 300,
-      "height": 30,
-      "angle": 0
-    },
-    {
-      "x": 360,
-      "y": 380,
       "width": 300,
       "height": 30,
       "angle": 0

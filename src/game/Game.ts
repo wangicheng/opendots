@@ -548,8 +548,8 @@ export class Game {
       laser.update(dt);
     }
 
-    // Only update physics and game state if playing
-    if (this.gameState !== GameState.PLAYING) return;
+    // Stop updates if game is over
+    if (this.gameState === GameState.WON || this.gameState === GameState.LOST) return;
 
     // Apply seesaw spring forces BEFORE physics step
     for (const seesaw of this.seesaws) {
@@ -559,10 +559,13 @@ export class Game {
     // Step physics world
     this.physicsWorld.step(Math.min(dt, 1 / 30));
 
-    // Process collision events
-    this.processCollisions();
+    // Process game logic only when playing
+    if (this.gameState === GameState.PLAYING) {
+      // Process collision events
+      this.processCollisions();
 
-    this.checkBoundaries();
+      this.checkBoundaries();
+    }
 
     // Update ball graphics from physics
     for (const ball of this.balls) {
