@@ -29,6 +29,7 @@ import {
   COLLISION_GROUP,
   LINE_WIDTH,
   SCALE,
+  FIXED_TIMESTEP,
 } from './config';
 import { EffectManager } from './effects/EffectManager';
 
@@ -61,6 +62,8 @@ export class Game {
   private effectManager: EffectManager;
   private gameState: GameState = GameState.READY;
   private autoRestartTimeout: ReturnType<typeof setTimeout> | null = null;
+  private accumulator: number = 0;
+
 
   // Collision handle mapping for ball detection
   private ballColliderHandles: Map<number, Ball> = new Map();
@@ -577,8 +580,10 @@ export class Game {
     };
 
     for (const ball of this.balls) {
-      const x = ball.graphics.position.x;
-      const y = ball.graphics.position.y;
+      const pos = ball.body.translation();
+      const pixelPos = this.physicsWorld.toPixels(pos.x, pos.y);
+      const x = pixelPos.x;
+      const y = pixelPos.y;
 
       if (x < bounds.minX || x > bounds.maxX || y > bounds.maxY) {
         this.handleLoss(ball);
@@ -586,6 +591,7 @@ export class Game {
       }
     }
   }
+
 
   /**
    * Apply acceleration to a rigid body from a conveyor belt using accurate Contact Manifolds
@@ -752,18 +758,10 @@ export class Game {
   }
 
   /**
-   * Main game loop update
+   * Fixed update loop for physics
    */
-  private update(ticker: PIXI.Ticker): void {
-    const dt = ticker.deltaMS / 1000;
-
-    // Update lasers (flip animation)
-    for (const laser of this.lasers) {
-      laser.update(dt);
-    }
-
-    // Stop updates if game is over
-    if (this.gameState === GameState.WON || this.gameState === GameState.LOST) return;
+  private fixedUpdate(dt: number): void {
+    if (this.gameState !== GameState.PLAYING) return;
 
     // Apply seesaw spring forces BEFORE physics step
     for (const seesaw of this.seesaws) {
@@ -775,17 +773,49 @@ export class Game {
       this.applyAcceleration(contact, dt);
     }
 
-
     // Step physics world
-    this.physicsWorld.step(Math.min(dt, 1 / 30));
+    this.physicsWorld.step(dt);
 
-    // Process game logic only when playing
-    if (this.gameState === GameState.PLAYING) {
-      // Process collision events
-      this.processCollisions();
+    // Process collision events
+    this.processCollisions();
 
-      this.checkBoundaries();
+    // Check boundaries (using physics positions)
+    this.checkBoundaries();
+  }
+
+  /**
+   * Main game loop update
+   */
+  private update(ticker: PIXI.Ticker): void {
+    const dt = ticker.deltaMS / 1000;
+    this.accumulator += dt;
+
+    // Cap accumulator to prevent spiral of death on lag
+    // (e.g. if dt is huge, we don't want to run too many physics steps)
+    if (this.accumulator > 0.1) {
+      this.accumulator = 0.1;
     }
+
+    while (this.accumulator >= FIXED_TIMESTEP) {
+      this.fixedUpdate(FIXED_TIMESTEP);
+      this.accumulator -= FIXED_TIMESTEP;
+
+      // Stop if game over to prevent state changes after win/loss
+      if (this.gameState === GameState.WON || this.gameState === GameState.LOST) {
+        this.accumulator = 0;
+        break;
+      }
+    }
+
+    // Check boundaries check was moved to fixedUpdate
+
+    // Update lasers (flip animation, visual only)
+    for (const laser of this.lasers) {
+      laser.update(dt);
+    }
+
+    // Stop updates if game is over
+    if (this.gameState === GameState.WON || this.gameState === GameState.LOST) return;
 
     // Update ball graphics from physics
     for (const ball of this.balls) {
@@ -796,6 +826,7 @@ export class Game {
     for (const obj of this.fallingObjects) {
       obj.update();
     }
+
 
     // Update drawn lines graphics from physics
     for (const line of this.drawnLines) {

@@ -13,6 +13,7 @@ export const GAME_HEIGHT = 720;
 // Physics world settings
 export const GRAVITY = -10; // Gravity pointing downward (in physics coordinates)
 // Note: Rapier uses internal fixed timestep, no velocity/position iterations needed
+export const FIXED_TIMESTEP = 1 / 60;
 
 // Ball settings
 export const BALL_RADIUS = 25; // pixels
