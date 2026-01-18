@@ -235,20 +235,22 @@ function drawMiterFill(
 export function drawLineWithCornerStyle(
   graphics: PIXI.Graphics,
   points: Point[],
+  color: number,
+  width: number,
   centroid: Point | null = null
 ): void {
   if (points.length < 1) return;
 
   const offsetX = centroid?.x ?? 0;
   const offsetY = centroid?.y ?? 0;
-  const halfWidth = LINE_WIDTH / 2;
+  const halfWidth = width / 2;
 
   graphics.beginPath();
 
   if (points.length === 1) {
     const p = points[0];
     graphics.circle(p.x - offsetX, p.y - offsetY, halfWidth);
-    graphics.fill(LINE_COLOR);
+    graphics.fill(color);
     return;
   }
 
@@ -278,7 +280,7 @@ export function drawLineWithCornerStyle(
     }
   }
 
-  graphics.fill(LINE_COLOR);
+  graphics.fill(color);
 }
 
 /**
@@ -289,17 +291,21 @@ export function createLinePhysicsColliders(
   centroid: Point,
   body: RAPIER.RigidBody,
   world: RAPIER.World,
-  R: typeof RAPIER
+  R: typeof RAPIER,
+  width: number,
+  density: number,
+  friction: number,
+  restitution: number
 ): RAPIER.Collider[] {
   const colliders: RAPIER.Collider[] = [];
-  const halfWidth = (LINE_WIDTH / 2) / SCALE;
+  const halfWidth = (width / 2) / SCALE;
 
   if (points.length === 1) {
     const x = (points[0].x - centroid.x) / SCALE;
     const y = -(points[0].y - centroid.y) / SCALE;
     const desc = R.ColliderDesc.ball(halfWidth)
       .setTranslation(x, y)
-      .setDensity(LINE_DENSITY)
+      .setDensity(density)
       .setCollisionGroups(COLLISION_GROUP.USER_LINE);
     colliders.push(world.createCollider(desc, body));
     return colliders;
@@ -332,9 +338,10 @@ export function createLinePhysicsColliders(
     const desc = R.ColliderDesc.cuboid(length / 2, halfWidth)
       .setTranslation(centerX, centerY)
       .setRotation(anglePhys)
-      .setDensity(LINE_DENSITY)
-      .setFriction(LINE_FRICTION)
-      .setRestitution(LINE_RESTITUTION)
+      .setRotation(anglePhys)
+      .setDensity(density)
+      .setFriction(friction)
+      .setRestitution(restitution)
       .setCollisionGroups(COLLISION_GROUP.USER_LINE);
 
     colliders.push(world.createCollider(desc, body));
@@ -350,9 +357,9 @@ export function createLinePhysicsColliders(
     const y = -(p.y - centroid.y) / SCALE;
     const desc = R.ColliderDesc.ball(halfWidth)
       .setTranslation(x, y)
-      .setDensity(LINE_DENSITY)
-      .setFriction(LINE_FRICTION)
-      .setRestitution(LINE_RESTITUTION)
+      .setDensity(density)
+      .setFriction(friction)
+      .setRestitution(restitution)
       .setCollisionGroups(COLLISION_GROUP.USER_LINE);
     colliders.push(world.createCollider(desc, body));
   }
@@ -375,13 +382,13 @@ export function createLinePhysicsColliders(
 
       // Calculate in Screen Pixels first
       const outer1 = {
-        x: centerVertex.x + nx1 * (LINE_WIDTH / 2),
-        y: centerVertex.y + ny1 * (LINE_WIDTH / 2)
+        x: centerVertex.x + nx1 * (width / 2),
+        y: centerVertex.y + ny1 * (width / 2)
       };
 
       const outer2 = {
-        x: centerVertex.x + nx2 * (LINE_WIDTH / 2),
-        y: centerVertex.y + ny2 * (LINE_WIDTH / 2)
+        x: centerVertex.x + nx2 * (width / 2),
+        y: centerVertex.y + ny2 * (width / 2)
       };
 
       const dir1 = { x: seg1.dirX, y: seg1.dirY };
@@ -392,7 +399,7 @@ export function createLinePhysicsColliders(
       if (miterPoint) {
         const dist = Math.sqrt(Math.pow(miterPoint.x - centerVertex.x, 2) + Math.pow(miterPoint.y - centerVertex.y, 2));
 
-        if (dist <= (LINE_WIDTH / 2) * MAX_MITER_RATIO) {
+        if (dist <= (width / 2) * MAX_MITER_RATIO) {
           // Convert 4 points to Physics Coords
           // outer1, miterPoint, outer2, centerVertex
           const scaleAndFlip = (px: number, py: number) => {
@@ -425,9 +432,9 @@ export function createLinePhysicsColliders(
           const desc = R.ColliderDesc.convexHull(vertices);
 
           if (desc) {
-            desc.setDensity(LINE_DENSITY)
-              .setFriction(LINE_FRICTION)
-              .setRestitution(LINE_RESTITUTION)
+            desc.setDensity(density)
+              .setFriction(friction)
+              .setRestitution(restitution)
               .setCollisionGroups(COLLISION_GROUP.USER_LINE);
 
             try {

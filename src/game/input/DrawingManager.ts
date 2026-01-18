@@ -6,8 +6,8 @@
 import * as PIXI from 'pixi.js';
 import { distanceSampling } from '../utils/douglasPeucker';
 import type { Point } from '../utils/douglasPeucker';
-import { LINE_COLOR, LINE_WIDTH, LINE_MIN_DISTANCE } from '../config';
 import { drawLineWithCornerStyle } from '../utils/lineRenderer';
+import { type Pen, DEFAULT_PEN } from '../data/PenData';
 
 export interface CollisionProvider {
   isPointValid(point: Point): boolean;
@@ -24,6 +24,7 @@ export class DrawingManager {
   private onLineComplete: ((points: Point[]) => void) | null = null;
   private onDrawingEnd: (() => void) | null = null;
   private collisionProvider: CollisionProvider | null = null;
+  private currentPen: Pen = DEFAULT_PEN;
 
   constructor(stage: PIXI.Container) {
     this.container = new PIXI.Container();
@@ -32,6 +33,13 @@ export class DrawingManager {
     // Create preview graphics once and keep it
     this.previewGraphics = new PIXI.Graphics();
     this.container.addChild(this.previewGraphics);
+  }
+
+  /**
+   * Set the current pen
+   */
+  setPen(pen: Pen): void {
+    this.currentPen = pen;
   }
 
   /**
@@ -136,7 +144,7 @@ export class DrawingManager {
         // If the segment to the intersection point is long enough, add it
         // Note: No offset needed because shape cast (with LINE_WIDTH/2 radius) already
         // ensures the entire line segment maintains proper distance from obstacles
-        if (distToIntersect >= LINE_MIN_DISTANCE) {
+        if (distToIntersect >= this.currentPen.minDistance) {
           this.currentPoints.push(intersection);
         }
 
@@ -151,7 +159,7 @@ export class DrawingManager {
     const dy = point.y - lastPoint.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
 
-    if (distance >= LINE_MIN_DISTANCE) {
+    if (distance >= this.currentPen.minDistance) {
       this.currentPoints.push(point);
     }
 
@@ -182,7 +190,7 @@ export class DrawingManager {
     if (this.currentPoints.length >= 1 && this.isValidStart) {
       // Simplify the line using only distance sampling, NO Douglas-Peucker
       // This ensures the physics shape matches the visual preview (which was distance thresholded)
-      const simplifiedPoints = distanceSampling(this.currentPoints, LINE_MIN_DISTANCE);
+      const simplifiedPoints = distanceSampling(this.currentPoints, this.currentPen.minDistance);
 
       // Need at least 1 point after simplification (single point = dot)
       if (simplifiedPoints.length >= 1 && this.onLineComplete) {
@@ -208,7 +216,13 @@ export class DrawingManager {
 
     // Draw main committed line using custom corner styles
     if (this.currentPoints.length >= 1 && this.isValidStart) {
-      drawLineWithCornerStyle(this.currentGraphics, this.currentPoints, null);
+      drawLineWithCornerStyle(
+        this.currentGraphics,
+        this.currentPoints,
+        this.currentPen.color,
+        this.currentPen.width,
+        null
+      );
     }
 
     // Draw ghost line to cursor using the separate preview graphics
@@ -220,11 +234,11 @@ export class DrawingManager {
       const dy = cursorPoint.y - lastPoint.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
 
-      if (distance >= LINE_MIN_DISTANCE) {
+      if (distance >= this.currentPen.minDistance) {
         // For preview, use simple stroke style
         this.previewGraphics.setStrokeStyle({
-          width: LINE_WIDTH,
-          color: LINE_COLOR,
+          width: this.currentPen.width,
+          color: this.currentPen.color,
           cap: 'round',
           join: 'round',
           alpha: 0.4, // Semi-transparent for ghost segment

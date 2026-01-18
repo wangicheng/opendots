@@ -16,6 +16,8 @@ import { Laser } from './objects/Laser';
 import { Seesaw } from './objects/Seesaw';
 import { ConveyorBelt } from './objects/ConveyorBelt';
 import { Button } from './objects/Button';
+import { PenSelectionUI } from './ui/PenSelectionUI';
+import { type Pen, DEFAULT_PEN } from './data/PenData';
 import { DrawingManager } from './input/DrawingManager';
 import { LevelManager } from './levels/LevelManager';
 import type { Point } from './utils/douglasPeucker';
@@ -66,6 +68,9 @@ export class Game {
   private autoRestartTimeout: ReturnType<typeof setTimeout> | null = null;
   private accumulator: number = 0;
 
+  private currentPen: Pen = DEFAULT_PEN;
+  private penSelectionUI: PenSelectionUI | null = null;
+  private penBtn: HTMLButtonElement | null = null;
 
   // Collision handle mapping for ball detection
   private ballColliderHandles: Map<number, Ball> = new Map();
@@ -302,6 +307,10 @@ export class Game {
       this.autoRestartTimeout = null;
     }
 
+    if (this.penBtn) {
+      this.penBtn.style.display = 'block';
+    }
+
     // Clear balls
     for (const ball of this.balls) {
       ball.destroy(this.physicsWorld);
@@ -408,6 +417,10 @@ export class Game {
       this.gameState = GameState.PLAYING;
       this.balls.forEach(ball => ball.activate());
       this.fallingObjects.forEach(obj => obj.activate());
+
+      if (this.penBtn) {
+        this.penBtn.style.display = 'none';
+      }
     }
   }
 
@@ -415,7 +428,7 @@ export class Game {
    * Handle when a line is drawn
    */
   private onLineDrawn(points: Point[]): void {
-    const line = new DrawnLine(this.physicsWorld, points);
+    const line = new DrawnLine(this.physicsWorld, points, this.currentPen);
     this.drawnLines.push(line);
     this.gameContainer.addChild(line.graphics);
 
@@ -476,8 +489,77 @@ export class Game {
       this.restartLevel();
     });
 
+    // Pen Selection Button
+    // Pen Selection Button
+    this.penBtn = document.createElement('button');
+    this.penBtn.textContent = '✏️ Pen';
+    this.penBtn.style.pointerEvents = 'auto';
+    this.penBtn.style.position = 'absolute';
+    this.penBtn.style.top = '20px';
+    this.penBtn.style.right = '140px'; // Positioned to the left of Restart
+    this.penBtn.style.padding = '8px 16px';
+    this.penBtn.style.fontSize = '16px';
+    this.penBtn.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+    this.penBtn.style.color = 'white';
+    this.penBtn.style.border = '1px solid rgba(255, 255, 255, 0.4)';
+    this.penBtn.style.borderRadius = '20px';
+    this.penBtn.style.cursor = 'pointer';
+    this.penBtn.style.backdropFilter = 'blur(4px)';
+    this.penBtn.style.transition = 'all 0.2s ease';
+
+    this.penBtn.addEventListener('mouseenter', () => {
+      if (this.penBtn) this.penBtn.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
+    });
+    this.penBtn.addEventListener('mouseleave', () => {
+      if (this.penBtn) this.penBtn.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+    });
+
+    this.penBtn.addEventListener('click', () => {
+      this.showPenSelection();
+    });
+
+    uiOverlay.appendChild(this.penBtn);
     uiOverlay.appendChild(restartBtn);
     container.appendChild(uiOverlay);
+  }
+
+  /**
+   * Show Pen Selection UI
+   */
+  private showPenSelection(): void {
+    if (this.penSelectionUI) {
+      this.gameContainer.removeChild(this.penSelectionUI);
+      this.penSelectionUI.destroy();
+      this.penSelectionUI = null;
+    }
+
+    this.penSelectionUI = new PenSelectionUI(
+      (pen) => {
+        this.currentPen = pen;
+        if (this.drawingManager) {
+          this.drawingManager.setPen(pen);
+        }
+        this.closePenSelection();
+      },
+      () => {
+        // If closed without selection, maybe keep default?
+        // Or insist on selection? User said "Choose a pen", implies mandatory or default.
+        // Let's assume closing uses current default.
+        this.closePenSelection();
+      },
+      this.currentPen.id
+    );
+
+    this.penSelectionUI.zIndex = 200; // Above everything
+    this.gameContainer.addChild(this.penSelectionUI);
+  }
+
+  private closePenSelection(): void {
+    if (this.penSelectionUI) {
+      this.gameContainer.removeChild(this.penSelectionUI);
+      this.penSelectionUI.destroy();
+      this.penSelectionUI = null;
+    }
   }
 
   /**

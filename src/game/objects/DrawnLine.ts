@@ -1,14 +1,10 @@
-/**
- * DrawnLine Game Object
- * A user-drawn line that becomes a physics object
- */
-
 import * as PIXI from 'pixi.js';
 import RAPIER from '@dimforge/rapier2d-compat';
 import { SCALE } from '../config';
 import { PhysicsWorld } from '../physics/PhysicsWorld';
 import type { Point } from '../utils/douglasPeucker';
 import { drawLineWithCornerStyle, createLinePhysicsColliders } from '../utils/lineRenderer';
+import type { Pen } from '../data/PenData';
 
 export class DrawnLine {
   public graphics: PIXI.Graphics;
@@ -16,10 +12,12 @@ export class DrawnLine {
   public colliders: RAPIER.Collider[] = [];
   private points: Point[];
   private physicsWorld: PhysicsWorld;
+  private pen: Pen;
 
-  constructor(physicsWorld: PhysicsWorld, points: Point[]) {
+  constructor(physicsWorld: PhysicsWorld, points: Point[], pen: Pen) {
     this.points = points;
     this.physicsWorld = physicsWorld;
+    this.pen = pen;
 
     // Calculate centroid for body position
     const centroid = this.calculateCentroid(points);
@@ -63,7 +61,13 @@ export class DrawnLine {
    * Draw the line with custom corner styles
    */
   private drawLine(centroid: Point): void {
-    drawLineWithCornerStyle(this.graphics, this.points, centroid);
+    drawLineWithCornerStyle(
+      this.graphics,
+      this.points,
+      this.pen.color,
+      this.pen.width,
+      centroid
+    );
   }
 
   /**
@@ -78,7 +82,11 @@ export class DrawnLine {
       centroid,
       this.body,
       world,
-      R
+      R,
+      this.pen.width,
+      this.pen.density,
+      this.pen.friction,
+      this.pen.restitution
     );
   }
 
@@ -99,7 +107,9 @@ export class DrawnLine {
    * Destroy the line
    */
   destroy(physicsWorld: PhysicsWorld): void {
-    physicsWorld.getWorld().removeRigidBody(this.body);
+    if (this.body) {
+      physicsWorld.getWorld().removeRigidBody(this.body);
+    }
     this.graphics.destroy();
   }
 }
