@@ -81,6 +81,12 @@ export interface ConveyorBeltConfig {
   maxVelocity?: number;   // Max velocity cap (m/s, default: |acceleration| * 1.0)
 }
 
+export interface ButtonConfig {
+  x: number;         // Center X position
+  y: number;         // Center Y position
+  angle?: number;    // Rotation in degrees (default: 0, sinks downward)
+}
+
 export interface LevelData {
   id: string;
   balls: {
@@ -94,4 +100,5 @@ export interface LevelData {
   lasers?: LaserConfig[];
   seesaws?: SeesawConfig[];
   conveyors?: ConveyorBeltConfig[];
+  buttons?: ButtonConfig[];
 }

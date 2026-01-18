@@ -100,6 +100,7 @@ export const COLLISION_GROUP = {
   LASER: 0x0200_FFFF,           // Group 9, sensor for laser hazard detection
   SEESAW: 0x0400_FFFF,          // Group 10, collides with all (rotating plank)
   CONVEYOR_BELT: 0x0800_FFFF,   // Group 11, sensor for conveyor belt
+  BUTTON: 0x1000_FFFF,          // Group 12, sensor for button press detection
 };
 
 // Old CATEGORY export for backward compatibility (deprecated)

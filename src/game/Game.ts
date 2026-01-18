@@ -15,6 +15,7 @@ import { IceBlock } from './objects/IceBlock';
 import { Laser } from './objects/Laser';
 import { Seesaw } from './objects/Seesaw';
 import { ConveyorBelt } from './objects/ConveyorBelt';
+import { Button } from './objects/Button';
 import { DrawingManager } from './input/DrawingManager';
 import { LevelManager } from './levels/LevelManager';
 import type { Point } from './utils/douglasPeucker';
@@ -53,6 +54,7 @@ export class Game {
   private lasers: Laser[] = [];
   private seesaws: Seesaw[] = [];
   private conveyors: ConveyorBelt[] = [];
+  private buttons: Button[] = [];
   private drawnLines: DrawnLine[] = [];
   private drawingManager: DrawingManager | null = null;
   private gameContainer: PIXI.Container;
@@ -73,6 +75,7 @@ export class Game {
   private drawnLineColliderHandles: Map<number, DrawnLine> = new Map();
   private fallingObjectColliderHandles: Map<number, FallingObject> = new Map();
   private seesawColliderHandles: Map<number, Seesaw> = new Map();
+  private buttonColliderHandles: Map<number, Button> = new Map();
   private activeConveyorContacts: { body: RAPIER.RigidBody, objectColliderHandle: number, conveyor: ConveyorBelt }[] = [];
 
 
@@ -151,7 +154,7 @@ export class Game {
    * Load the first level
    */
   private async createGameObjects(): Promise<void> {
-    await this.loadLevel(0);
+    await this.loadLevel(5);
   }
 
   /**
@@ -244,6 +247,18 @@ export class Game {
         this.conveyors.push(conveyor);
         this.gameContainer.addChild(conveyor.graphics);
         this.conveyorHandles.set(conveyor.getColliderHandle(), conveyor);
+      }
+    }
+
+    // Spawn Buttons
+    if (levelData.buttons) {
+      for (const config of levelData.buttons) {
+        const button = new Button(this.physicsWorld, config);
+        this.buttons.push(button);
+        this.gameContainer.addChild(button.graphics);
+        for (const handle of button.getColliderHandles()) {
+          this.buttonColliderHandles.set(handle, button);
+        }
       }
     }
 
@@ -346,6 +361,13 @@ export class Game {
     this.conveyors = [];
     this.conveyorHandles.clear();
     this.activeConveyorContacts = [];
+
+    // Clear buttons
+    for (const button of this.buttons) {
+      button.destroy(this.physicsWorld);
+    }
+    this.buttons = [];
+    this.buttonColliderHandles.clear();
 
 
 
@@ -512,6 +534,15 @@ export class Game {
           if (hitBall) {
             this.handleLoss(hitBall);
           }
+        }
+
+        // Check for button collisions with balls
+        const button1 = this.buttonColliderHandles.get(handle1);
+        const button2 = this.buttonColliderHandles.get(handle2);
+        const ballHitButton = (button1 && ball2) || (button2 && ball1);
+
+        if (ballHitButton) {
+          this.triggerButtonPress();
         }
       }
 
@@ -758,6 +789,34 @@ export class Game {
   }
 
   /**
+   * Trigger button press effect - remove all lasers and sink all buttons
+   */
+  private triggerButtonPress(): void {
+    // Immediately destroy all lasers
+    for (const laser of this.lasers) {
+      laser.destroy(this.physicsWorld);
+    }
+    this.lasers = [];
+    this.laserColliderHandles.clear();
+
+    // Trigger sink animation for all buttons
+    for (const button of this.buttons) {
+      button.triggerSink(() => {
+        // Remove button after sink animation completes
+        button.destroy(this.physicsWorld);
+        const index = this.buttons.indexOf(button);
+        if (index > -1) {
+          this.buttons.splice(index, 1);
+        }
+        // Clear collider handles for this button
+        for (const handle of button.getColliderHandles()) {
+          this.buttonColliderHandles.delete(handle);
+        }
+      });
+    }
+  }
+
+  /**
    * Fixed update loop for physics
    */
   private fixedUpdate(dt: number): void {
@@ -812,6 +871,11 @@ export class Game {
     // Update lasers (flip animation, visual only)
     for (const laser of this.lasers) {
       laser.update(dt);
+    }
+
+    // Update buttons (sink animation)
+    for (const button of this.buttons) {
+      button.update(dt);
     }
 
     // Stop updates if game is over
