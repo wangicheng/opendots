@@ -142,7 +142,7 @@ export class DrawingManager {
         const distToIntersect = Math.sqrt(dx * dx + dy * dy);
 
         // If the segment to the intersection point is long enough, add it
-        // Note: No offset needed because shape cast (with LINE_WIDTH/2 radius) already
+        // Note: No offset needed because shape cast (with current pen width radius) already
         // ensures the entire line segment maintains proper distance from obstacles
         if (distToIntersect >= this.currentPen.minDistance) {
           this.currentPoints.push(intersection);

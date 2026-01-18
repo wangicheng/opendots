@@ -5,7 +5,7 @@
 
 import * as PIXI from 'pixi.js';
 import RAPIER from '@dimforge/rapier2d-compat';
-import { SCALE, LINE_COLOR, LINE_WIDTH, LINE_DENSITY, LINE_FRICTION, LINE_RESTITUTION, COLLISION_GROUP } from '../config';
+import { SCALE, COLLISION_GROUP } from '../config';
 import type { Point } from './douglasPeucker';
 
 /** Threshold angle in radians (30 degrees) */

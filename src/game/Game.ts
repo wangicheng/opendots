@@ -30,7 +30,6 @@ import {
   BALL_COLORS,
   BALL_RADIUS,
   COLLISION_GROUP,
-  LINE_WIDTH,
   SCALE,
   FIXED_TIMESTEP,
 } from './config';
@@ -1046,9 +1045,9 @@ export class Game {
     if (len > 0.001) {
       const dir = { x: dx / len, y: dy / len };
 
-      // Use a ball shape with radius equal to half of LINE_WIDTH (the line's visual radius)
+      // Use a ball shape with radius equal to half of current pen width (the line's visual radius)
       // This ensures the entire line (including its thickness) stays away from obstacles
-      const shapeRadius = (LINE_WIDTH / 2) / SCALE;
+      const shapeRadius = (this.currentPen.width / 2) / SCALE;
       const shape = new R.Ball(shapeRadius);
 
       // Shape cast from p1 in direction of p2

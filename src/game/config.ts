@@ -61,16 +61,6 @@ export const CONVEYOR_BELT_VELOCITY_FACTOR = 1.0; // Max velocity = |acceleratio
 export const CONVEYOR_BELT_GEAR_SPEED_FACTOR = 1.0; // Gear rotation speed = |acceleration| × factor
 export const CONVEYOR_BELT_FRICTION = 0.0;      // Friction for conveyor belt
 
-// Line drawing settings
-export const LINE_COLOR = 0x333333;
-export const LINE_WIDTH = 7; // pixels
-export const LINE_MIN_DISTANCE = 15; // Minimum distance between points
-
-// Line physics
-export const LINE_DENSITY = 1.0;
-export const LINE_FRICTION = 0.02;
-export const LINE_RESTITUTION = 0.0;
-
 // Background
 export const BACKGROUND_COLOR = 0xF5F5F5;
 export const GRID_SIZE = 36;
