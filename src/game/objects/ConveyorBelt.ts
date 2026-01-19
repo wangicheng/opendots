@@ -25,8 +25,8 @@ const BORDER_WIDTH = 9;
 
 export class ConveyorBelt {
   public graphics: PIXI.Container;
-  private leftGear: PIXI.Graphics;
-  private rightGear: PIXI.Graphics;
+  private leftGear: PIXI.Sprite;
+  private rightGear: PIXI.Sprite;
   public body: RAPIER.RigidBody;
   public topCollider: RAPIER.Collider;
 
@@ -56,8 +56,8 @@ export class ConveyorBelt {
     this.graphics = ConveyorBelt.createVisual(config);
     // Retrieve gears
     // Children order: outline (0), leftGear (1), rightGear (2)
-    this.leftGear = this.graphics.children[1] as PIXI.Graphics;
-    this.rightGear = this.graphics.children[2] as PIXI.Graphics;
+    this.leftGear = this.graphics.children[1] as PIXI.Sprite;
+    this.rightGear = this.graphics.children[2] as PIXI.Sprite;
 
     // --- Physics Setup ---
     const world = physicsWorld.getWorld();
@@ -155,55 +155,24 @@ export class ConveyorBelt {
       g.stroke({ width: BORDER_WIDTH, color: CONVEYOR_BELT_COLOR });
     };
 
-    const drawGear = (g: PIXI.Graphics) => {
-      const teeth = 6;
-      const outerRadius = radius * 0.65; // Adjust overall size
-      const rootRadius = outerRadius * 0.8; // Ratio for "short" teeth
-      const toothWidth = rootRadius * 0.5;  // Width for "thick" teeth
-      const holeRadius = rootRadius * 0.45;   // Hole size
-
-      const hw = toothWidth / 2;
-      const rootX = Math.sqrt(rootRadius * rootRadius - hw * hw);
-      const beta = Math.atan2(hw, rootX);
-
-      g.clear();
-      g.moveTo(rootX, -hw);
-
-      for (let i = 0; i < teeth; i++) {
-        const theta = (i * Math.PI * 2) / teeth;
-        const cos = Math.cos(theta);
-        const sin = Math.sin(theta);
-
-        const p2 = { x: cos * outerRadius - sin * -hw, y: sin * outerRadius + cos * -hw };
-        const p3 = { x: cos * outerRadius - sin * hw, y: sin * outerRadius + cos * hw };
-        const p4 = { x: cos * rootX - sin * hw, y: sin * rootX + cos * hw };
-
-        g.lineTo(p2.x, p2.y);
-        g.lineTo(p3.x, p3.y);
-        g.lineTo(p4.x, p4.y);
-
-        const startAngle = theta + beta;
-        const endAngle = theta + (Math.PI * 2 / teeth) - beta;
-
-        g.arc(0, 0, rootRadius, startAngle, endAngle);
-      }
-
-      g.fill({ color: CONVEYOR_BELT_COLOR });
-      g.circle(0, 0, holeRadius);
-      g.cut();
-    };
-
-
     // Create shape outline (rectangle + semicircles)
     const outline = new PIXI.Graphics();
     drawOutline(outline);
     graphics.addChild(outline);
 
-    // Create gears
-    const leftGear = new PIXI.Graphics();
-    const rightGear = new PIXI.Graphics();
-    drawGear(leftGear);
-    drawGear(rightGear);
+    // Create gears (now using sprites)
+    const gearDiameter = height * 0.65; // Matches previous visual size
+
+    const createGearSprite = () => {
+      const gear = PIXI.Sprite.from('/gear.png');
+      gear.anchor.set(0.5);
+      gear.width = gearDiameter;
+      gear.height = gearDiameter;
+      return gear;
+    };
+
+    const leftGear = createGearSprite();
+    const rightGear = createGearSprite();
 
     // Position gears at semicircle centers
     leftGear.position.set(-width / 2, 0);

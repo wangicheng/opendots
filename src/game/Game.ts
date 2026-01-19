@@ -122,6 +122,7 @@ export class Game {
 
     // Load assets
     await PIXI.Assets.load('/object_ami.png');
+    await PIXI.Assets.load('/gear.png');
     this.laserTexture = await PIXI.Assets.load('/laser.png');
 
     console.log('Pixi initialized, adding canvas...');
