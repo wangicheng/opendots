@@ -84,37 +84,33 @@ export class LevelSelectionUI extends PIXI.Container {
 
   private createHeaderButton(iconChar: string): PIXI.Container {
     const size = 60;
-    const btn = new PIXI.Container();
+    const container = new PIXI.Container();
 
     // Circle Outline
     const circle = new PIXI.Graphics();
-    circle.circle(0, 0, size / 2);
-    // circle.fill({ color: 0xFFFFFF, alpha: 0.8 }); // Optional background
+    circle.circle(size / 2, size / 2, size / 2);
     circle.stroke({ width: 3, color: 0x555555 });
-
-    btn.addChild(circle);
+    container.addChild(circle);
 
     // Icon Text
     const text = new PIXI.Text({
       text: iconChar,
-      style: { fontFamily: 'bootstrap-icons', fontSize: 40, fill: '#555555' }
+      style: {
+        fontFamily: 'bootstrap-icons',
+        fontSize: 40,
+        fill: '#555555',
+        padding: 10 // Prevent clipping of icon glyphs
+      }
     });
     text.anchor.set(0.5);
-    text.y = 6; // Slightly move down to center visually
-    btn.addChild(text);
+    text.position.set(size / 2, size / 2 + 5); // Center and slightly offset for visual balance
+    container.addChild(text);
 
     // Interactive
-    btn.eventMode = 'static';
-    btn.cursor = 'pointer';
+    container.eventMode = 'static';
+    container.cursor = 'pointer';
 
-    // Position offset because circle is drawn from center (0,0)
-    // We want the container to handle positioning easily, so let's check bounds.
-    // Actually, let's wrap it so (0,0) is top-left of the button for easier layout
-    const wrapper = new PIXI.Container();
-    wrapper.addChild(btn);
-    btn.position.set(size / 2, size / 2);
-
-    return wrapper;
+    return container;
   }
 
   private setupGrid(): void {
