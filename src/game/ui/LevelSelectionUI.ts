@@ -103,7 +103,7 @@ export class LevelSelectionUI extends PIXI.Container {
       }
     });
     text.anchor.set(0.5);
-    text.position.set(size / 2, size / 2 + 5); // Center and slightly offset for visual balance
+    text.position.set(size / 2, size / 2 + 6); // Center and slightly offset for visual balance
     container.addChild(text);
 
     // Interactive
