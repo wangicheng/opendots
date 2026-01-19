@@ -439,7 +439,7 @@ export class Game {
    * Handle when a line is drawn
    */
   private onLineDrawn(points: Point[]): void {
-    if (this.gameState === GameState.MENU) return;
+    if (this.gameState !== GameState.READY && this.gameState !== GameState.PLAYING) return;
 
     const line = new DrawnLine(this.physicsWorld, points, this.currentPen);
     this.drawnLines.push(line);
@@ -1004,7 +1004,8 @@ export class Game {
     }
 
     // Stop updates if game is over
-    if (this.gameState === GameState.WON || this.gameState === GameState.LOST) return;
+    // Stop updates if game is over - REMOVED to allow final frame render and animations
+    // if (this.gameState === GameState.WON || this.gameState === GameState.LOST) return;
 
     // Update ball graphics from physics
     for (const ball of this.balls) {
