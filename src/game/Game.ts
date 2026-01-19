@@ -1123,8 +1123,12 @@ export class Game {
    * Uses shape cast (ball shape) instead of ray cast to ensure the entire line segment
    * maintains a minimum distance from restricted areas.
    */
+  /**
+   * Check intersection for drawing
+   * Uses multiple ray casts instead of shape cast to avoid precision issues
+   */
   private checkIntersection(p1: Point, p2: Point): Point | null {
-    // 1. Check Physics World (Shape Cast)
+    // 1. Check Physics World (Ray Casts)
     const world = this.physicsWorld.getWorld();
     const R = this.physicsWorld.getRAPIER();
 
@@ -1138,44 +1142,131 @@ export class Game {
     if (len > 0.001) {
       const dir = { x: dx / len, y: dy / len };
 
-      // Use a ball shape with radius equal to half of current pen width (the line's visual radius)
-      // This ensures the entire line (including its thickness) stays away from obstacles
-      const shapeRadius = (this.currentPen.width / 2) / SCALE;
-      const shape = new R.Ball(shapeRadius);
+      // Calculate perpendicular offset for thickness check
+      // Use half width to check the edges of the line
+      const radius = (this.currentPen.width / 2) / SCALE;
+      const orthoX = -dir.y * radius;
+      const orthoY = dir.x * radius;
 
-      // Shape cast from p1 in direction of p2
-      // API: castShape(shapePos, shapeRot, shapeVel, shape, targetDistance, maxToi, stopAtPenetration, filterFlags, filterGroups, ...)
-      const targetDistance = 0.0;  // We want the first hit, not with some margin
-      const maxToi = len;           // Maximum time of impact is the length of the segment
-      const stopAtPenetration = true; // Stop at first contact if already penetrating
+      // Define rays to cast across the width to simulate thickness
+      // We cast multiple rays distributed across the width of the line to prevent leakage
+      const numRays = 7;
+      const rays = [];
 
-      const hit = world.castShape(
-        physP1,           // shapePos: starting position
-        0,                // shapeRot: rotation (0 for ball)
-        dir,              // shapeVel: direction of movement (unit vector)
-        shape,            // shape: the ball shape
-        targetDistance,   // targetDistance: separation distance at which we consider a hit
-        maxToi,           // maxToi: maximum time of impact (distance in this case)
-        stopAtPenetration,// stopAtPenetration: if true, reports hit even when initially penetrating
-        undefined,        // filterFlags: optional, we use filterGroups
-        COLLISION_GROUP.ALL // filterGroups: collision filter groups
-      );
+      for (let i = 0; i < numRays; i++) {
+        // Calculate offset factor from -1 to 1
+        // i=0 -> -1 (Left Edge)
+        // i=mid -> 0 (Center)
+        // i=max -> 1 (Right Edge)
+        const t = i / (numRays - 1);
+        const offset = (t - 0.5) * 2;
 
-      if (hit) {
-        // hit.time_of_impact (toi) is the distance along the direction vector where the hit occurred
-        // The hit point is at p1 + dir * toi
-        const toi = hit.time_of_impact;
-        const hitX = physP1.x + dir.x * toi;
-        const hitY = physP1.y + dir.y * toi;
-        const pixelHit = this.physicsWorld.toPixels(hitX, hitY);
-
-        return pixelHit;
+        rays.push(new R.Ray({
+          x: physP1.x + orthoX * offset,
+          y: physP1.y + orthoY * offset
+        }, dir));
       }
-    }
 
-    // 2. Check Nets is now covered by the Physics World Shape Cast above
-    // because Net now has a collider in the COLLISION_GROUP.NET
-    // and the shape cast mask 0xFFFFFFFF includes it.
+      let minToi = len;
+      let hasHit = false;
+
+      for (const ray of rays) {
+        const hit = world.castRay(
+          ray,
+          len,
+          true,
+          undefined,
+          COLLISION_GROUP.ALL
+        );
+
+        if (hit) {
+          if (hit.timeOfImpact < minToi) {
+            minToi = hit.timeOfImpact;
+            hasHit = true;
+          }
+        }
+      }
+
+      // Additional Tip Clearance Check
+      // We want to find the furthest point along the calculated path (up to minToi)
+      // such that a larger 'tip' shape centered at that point DOES NOT collide with anything.
+      const TIP_DIAMETER_EXTRA_PX = 1;
+      const tipRadius = ((this.currentPen.width + TIP_DIAMETER_EXTRA_PX) / 2) / SCALE;
+      const tipShape = new R.Ball(tipRadius);
+
+      // Helper to check validity at distance t
+      const checkIsValid = (t: number): boolean => {
+        const testX = physP1.x + dir.x * t;
+        const testY = physP1.y + dir.y * t;
+
+        // intersectionWithShape returns a Collider if overlapping, null otherwise
+        const hit = world.intersectionWithShape(
+          { x: testX, y: testY },
+          0,
+          tipShape,
+          undefined,
+          COLLISION_GROUP.ALL
+        );
+        return !hit;
+      };
+
+      // 1. Check if the furthest possible point (determined by rays) is valid.
+      if (checkIsValid(minToi)) {
+        if (hasHit) {
+          const hitX = physP1.x + dir.x * minToi;
+          const hitY = physP1.y + dir.y * minToi;
+          // If ray hit, we respect it
+          return this.physicsWorld.toPixels(hitX, hitY);
+        }
+        // If not hit by rays and tip is valid at end, we return null (no intersection within segment)
+        // BUT wait, checkIntersection returns "Point | null".
+        // If we return null, it means "no collision", so the line is drawn fully to p2.
+        // This is what we want if p2 is valid.
+        return null;
+      } else {
+        // 2. The physical limit is invalid (too close to wall for the thick tip).
+        // We linear scan backwards from minToi to find the first valid point.
+        // User explicitly warned against binary search because the validity is not guaranteed to be monotonic.
+        // "Find an endpoint as far as possible... only endpoint needs check"
+
+        const STEP_PX = 4; // Check every 4 pixels backwards
+        const stepPhys = STEP_PX / SCALE;
+
+        // We already checked minToi (it failed). Start backing up.
+        let t = minToi - stepPhys;
+
+        while (t > 0) {
+          if (checkIsValid(t)) {
+            // Found a valid spot!
+            const hitX = physP1.x + dir.x * t;
+            const hitY = physP1.y + dir.y * t;
+            return this.physicsWorld.toPixels(hitX, hitY);
+          }
+          t -= stepPhys;
+        }
+
+        // If we backed up all the way to 0 and found nothing valid,
+        // we essentially can't draw anything valid from this start point in this direction.
+        // Return p1 to stop drawing.
+        const hitX = physP1.x;
+        const hitY = physP1.y;
+        return this.physicsWorld.toPixels(hitX, hitY);
+      }
+
+      // If we are here, logic flow is a bit split above.
+      // logic:
+      // if valid(minToi):
+      //    if hasHit -> return point(minToi)
+      //    else -> return null (allow full line)
+      // else:
+      //    scan back, return point(validT) or point(0)
+
+      // The original code returned point(minToi) if hasHit at the end.
+      // Our logic above handles returns. 
+      // checkIntersection implicitly returns null if "no collision" (i.e. draw user's full line).
+      // So if (checkIsValid(minToi) && !hasHit) return null; covers it.
+
+    }
 
     return null;
   }
