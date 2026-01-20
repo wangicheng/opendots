@@ -8,7 +8,7 @@ import level6 from '../levels/level6.json';
 import level7 from '../levels/level7.json';
 
 // Local storage key for custom levels
-const STORAGE_KEY = 'braindots_custom_levels';
+const STORAGE_KEY = 'opendots_custom_levels';
 export const CURRENT_USER_ID = 'user_me';
 
 export class MockLevelService {

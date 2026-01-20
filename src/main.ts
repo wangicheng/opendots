@@ -1,5 +1,5 @@
 /**
- * Brain Dots - Main Entry Point
+ * Open Dots - Main Entry Point
  */
 
 import './style.css';
@@ -14,7 +14,7 @@ async function main(): Promise<void> {
     const game = new Game();
     await game.init();
 
-    console.log('🎮 Brain Dots Demo loaded!');
+    console.log('🎮 Open Dots Demo loaded!');
     console.log('Draw lines with your mouse - they will become physics objects!');
   } catch (err: any) {
     console.error('Failed to start game:', err);

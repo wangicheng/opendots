@@ -102,7 +102,7 @@ export class LevelSelectionUI extends PIXI.Container {
       fontWeight: 'bold',
       fill: '#555555',
     });
-    const title = new PIXI.Text({ text: 'Brain Dots', style: titleStyle });
+    const title = new PIXI.Text({ text: 'Open Dots', style: titleStyle });
     title.position.set(scale(60), (headerHeight - title.height) / 2);
     this.headerContainer.addChild(title);
 
