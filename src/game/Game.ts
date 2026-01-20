@@ -400,9 +400,9 @@ export class Game {
       this.drawingManager.setCollisionProvider({
         isPointValid: (point: Point) => {
           // Unscale from visual space to design space for physics check
-          const scaleFactor = getScaleFactor();
-          const designX = point.x / scaleFactor;
-          const designY = point.y / scaleFactor;
+          // Point is already in design coordinates from DrawingManager
+          const designX = point.x;
+          const designY = point.y;
 
           // Check Nets
           // Net check is now covered by Physics World intersection check below
