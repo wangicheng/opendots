@@ -20,6 +20,8 @@ import { PenSelectionUI } from './ui/PenSelectionUI';
 import { type Pen, DEFAULT_PEN } from './data/PenData';
 import { DrawingManager } from './input/DrawingManager';
 import { LevelManager } from './levels/LevelManager';
+import { MockLevelService } from './services/MockLevelService';
+import type { LevelData } from './levels/LevelSchema';
 import type { Point } from './utils/douglasPeucker';
 import {
   GAME_WIDTH,
@@ -64,7 +66,6 @@ export class Game {
   private menuContainer: PIXI.Container;
   private interactionArea: PIXI.Graphics;
   private hasStarted: boolean = false;
-  private currentLevelIndex: number = 0;
   private effectManager: EffectManager;
   private gameState: GameState = GameState.READY;
   private autoRestartTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -177,16 +178,19 @@ export class Game {
 
 
   /**
-   * Load level by index
+   * Load level by data
    */
-  async loadLevel(index: number): Promise<void> {
-    const levelData = await this.levelManager.loadLevel(index);
+  async loadLevel(data: LevelData): Promise<void> {
+    await this.levelManager.loadLevelData(data);
+    const levelData = this.levelManager.getCurrentLevel();
+
     if (!levelData) {
-      console.error('Failed to load level', index);
+      console.error('Failed to load level data');
       return;
     }
 
-    this.currentLevelIndex = index;
+    // this.currentLevelIndex is no longer the primary way we identify levels, 
+    // but we might want to track ID or title for display.
     this.gameState = GameState.READY;
 
     // Clear existing dynamic objects
@@ -573,7 +577,10 @@ export class Game {
    * Restart the current level
    */
   private async restartLevel(): Promise<void> {
-    await this.loadLevel(this.currentLevelIndex);
+    const current = this.levelManager.getCurrentLevel();
+    if (current) {
+      await this.loadLevel(current);
+    }
   }
 
   /**
@@ -1042,19 +1049,13 @@ export class Game {
   private async initMenu(): Promise<void> {
     // Dynamic import to avoid circular dependencies if any
     const { LevelSelectionUI } = await import('./ui/LevelSelectionUI');
-    // For now we get all levels from manager
-    // For now we get all levels from manager
-    // Let's create a temporary array of indices or similar. 
-    // LevelManager doesn't expose getAllLevels directly, let's just loop.
-    const levels = [];
-    const count = this.levelManager.getLevelCount();
-    for (let i = 0; i < count; i++) {
-      const l = await this.levelManager.loadLevel(i);
-      if (l) levels.push(l);
-    }
 
-    this.levelSelectionUI = new LevelSelectionUI(levels, (index) => {
-      this.startLevel(index);
+    // Fetch all levels (built-in + user uploaded) from Service
+    const levelService = MockLevelService.getInstance();
+    const levels = await levelService.getLevelList();
+
+    this.levelSelectionUI = new LevelSelectionUI(levels, (levelData) => {
+      this.startLevel(levelData);
     }, this.laserTexture || undefined, (pen) => {
       this.currentPen = pen;
       if (this.drawingManager) {
@@ -1078,12 +1079,12 @@ export class Game {
     if (this.homeBtnContainer) this.homeBtnContainer.visible = false;
   }
 
-  private async startLevel(index: number): Promise<void> {
+  private async startLevel(levelData: LevelData): Promise<void> {
     this.menuContainer.visible = false;
     this.gameContainer.visible = true;
     this.gameState = GameState.READY; // Will switch to PLAYING on interaction
 
-    await this.loadLevel(index);
+    await this.loadLevel(levelData);
 
     if (this.penBtnContainer) this.penBtnContainer.visible = true;
     if (this.restartBtnContainer) this.restartBtnContainer.visible = true;

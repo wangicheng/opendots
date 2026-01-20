@@ -89,6 +89,10 @@ export interface ButtonConfig {
 
 export interface LevelData {
   id: string;
+  author?: string;
+  authorId?: string;
+  createdAt?: number;
+  likes?: number;
   balls: {
     blue: BallConfig;
     pink: BallConfig;

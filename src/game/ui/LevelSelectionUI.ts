@@ -13,10 +13,12 @@ import { ConveyorBelt } from '../objects/ConveyorBelt';
 import { Button } from '../objects/Button';
 import { PenSelectionUI } from './PenSelectionUI';
 import { type Pen } from '../data/PenData';
+import { UserProfileCard } from './modals/UserProfileCard';
+import { CURRENT_USER_ID } from '../services/MockLevelService';
 
 export class LevelSelectionUI extends PIXI.Container {
   private levels: LevelData[];
-  private onSelect: (index: number) => void;
+  private onSelect: (level: LevelData) => void;
   private currentPage: number = 0;
   private totalPages: number = 0;
   private laserTexture?: PIXI.Texture;
@@ -28,8 +30,21 @@ export class LevelSelectionUI extends PIXI.Container {
   private dragDistance: number = 0; // Cumulative or max displacement to distinguish tap from swipe
 
   private penSelectionUI: PenSelectionUI | null = null;
+  private userProfileCard: UserProfileCard | null = null;
   private onPenSelect?: (pen: Pen) => void;
   private currentPenId: string = 'pen_default';
+
+  // Sorting and Filtering
+  // Sorting and Filtering
+  private sortMode: 'latest' | 'popular' = 'latest';
+  private filterAuthorId: string | null = null;
+  private visibleLevels: LevelData[] = [];
+
+  // UI Elements
+  private latestBtnText?: PIXI.Text;
+  private popularBtnText?: PIXI.Text;
+  private mineBtnText?: PIXI.Text;
+  private filterFilterTagContainer?: PIXI.Container;
 
   // Constants for Layout
   private readonly HEADER_HEIGHT = GAME_HEIGHT / 5;
@@ -40,7 +55,7 @@ export class LevelSelectionUI extends PIXI.Container {
 
   constructor(
     levels: LevelData[],
-    onSelect: (index: number) => void,
+    onSelect: (level: LevelData) => void,
     laserTexture?: PIXI.Texture,
     onPenSelect?: (pen: Pen) => void,
     initialPenId?: string
@@ -53,8 +68,6 @@ export class LevelSelectionUI extends PIXI.Container {
     if (initialPenId) this.currentPenId = initialPenId;
     this.totalPages = Math.ceil(levels.length / this.ITEMS_PER_PAGE);
 
-    this.sortableChildren = true;
-
     // Create Main Containers
     this.headerContainer = new PIXI.Container();
     this.gridContainer = new PIXI.Container();
@@ -63,7 +76,10 @@ export class LevelSelectionUI extends PIXI.Container {
     this.addChild(this.headerContainer);
 
     this.setupHeader();
-    this.setupGrid();
+
+    // Initial sort/filter and grid setup
+    this.refreshVisibleLevels();
+
     this.setupInteraction();
   }
 
@@ -83,6 +99,40 @@ export class LevelSelectionUI extends PIXI.Container {
     title.position.set(60, (this.HEADER_HEIGHT - title.height) / 2); // Vertically centered
     this.headerContainer.addChild(title);
 
+    // 2.5 Sorting / Filtering UI (Center-Right)
+    const sortY = (this.HEADER_HEIGHT + 10) / 2;
+    // Shift sort buttons left to make room for filter tag
+    const sortX = GAME_WIDTH / 2 - 140;
+
+    // "Latest" Button
+    this.latestBtnText = this.createSortButton('Latest', sortX, sortY, 'latest');
+    this.headerContainer.addChild(this.latestBtnText);
+
+    // "Popular" Button
+    this.popularBtnText = this.createSortButton('Popular', sortX + 100, sortY, 'popular');
+    this.headerContainer.addChild(this.popularBtnText);
+
+    // "Mine" Button
+    this.mineBtnText = this.createHeaderInteractiveText('Mine', sortX + 220, sortY, () => {
+      // Toggle "Mine" filter
+      if (this.filterAuthorId === CURRENT_USER_ID) {
+        this.setFilterAuthor(null);
+      } else {
+        this.setFilterAuthor(CURRENT_USER_ID);
+      }
+    });
+    this.headerContainer.addChild(this.mineBtnText);
+
+    // Filter Tag Component (Initially hidden/empty)
+    this.filterFilterTagContainer = new PIXI.Container();
+    // Position closer to the action buttons (Pen is at ~1100)
+    this.filterFilterTagContainer.position.set(GAME_WIDTH - 220, sortY);
+    this.headerContainer.addChild(this.filterFilterTagContainer);
+    // Render initial empty state
+    this.updateFilterTag();
+
+    this.updateSortButtons();
+
     // 3. Action Area (Right)
     const btnY = 36;
 
@@ -98,6 +148,48 @@ export class LevelSelectionUI extends PIXI.Container {
     penBtn.position.set(penX, btnY);
     penBtn.on('pointertap', () => this.showPenSelection());
     this.headerContainer.addChild(penBtn);
+  }
+
+  private createSortButton(text: string, x: number, y: number, mode: 'latest' | 'popular'): PIXI.Text {
+    return this.createHeaderInteractiveText(text, x, y, () => {
+      this.setSortMode(mode);
+    });
+  }
+
+  private createHeaderInteractiveText(text: string, x: number, y: number, onClick: () => void): PIXI.Text {
+    const btn = new PIXI.Text({
+      text: text,
+      style: {
+        fontFamily: 'Arial',
+        fontSize: 24,
+        fill: '#AAAAAA',
+        fontWeight: 'normal'
+      }
+    });
+    btn.anchor.set(0, 0.5);
+    btn.position.set(x, y);
+    btn.eventMode = 'static';
+    btn.cursor = 'pointer';
+    btn.on('pointertap', onClick);
+    return btn;
+  }
+
+  private updateSortButtons(): void {
+    if (this.latestBtnText) {
+      const isSelected = this.sortMode === 'latest';
+      this.latestBtnText.style.fill = isSelected ? '#555555' : '#AAAAAA';
+      this.latestBtnText.style.fontWeight = isSelected ? 'bold' : 'normal';
+    }
+    if (this.popularBtnText) {
+      const isSelected = this.sortMode === 'popular';
+      this.popularBtnText.style.fill = isSelected ? '#555555' : '#AAAAAA';
+      this.popularBtnText.style.fontWeight = isSelected ? 'bold' : 'normal';
+    }
+    if (this.mineBtnText) {
+      const isSelected = this.filterAuthorId === CURRENT_USER_ID;
+      this.mineBtnText.style.fill = isSelected ? '#555555' : '#AAAAAA';
+      this.mineBtnText.style.fontWeight = isSelected ? 'bold' : 'normal';
+    }
   }
 
   private createHeaderButton(iconChar: string): PIXI.Container {
@@ -134,6 +226,9 @@ export class LevelSelectionUI extends PIXI.Container {
   }
 
   private setupGrid(): void {
+    // Clear existing grid children first (for re-render)
+    this.gridContainer.removeChildren();
+
     // Render all pages horizontally
     for (let p = 0; p < this.totalPages; p++) {
       const pageContainer = new PIXI.Container();
@@ -141,7 +236,7 @@ export class LevelSelectionUI extends PIXI.Container {
       this.gridContainer.addChild(pageContainer);
 
       const startIndex = p * this.ITEMS_PER_PAGE;
-      const endIndex = Math.min(startIndex + this.ITEMS_PER_PAGE, this.levels.length);
+      const endIndex = Math.min(startIndex + this.ITEMS_PER_PAGE, this.visibleLevels.length);
 
       this.renderPage(pageContainer, startIndex, endIndex);
     }
@@ -173,7 +268,7 @@ export class LevelSelectionUI extends PIXI.Container {
       const x = hGap + col * (cardWidth + hGap);
       const y = startY + row * (cardHeight + vGap);
 
-      const card = this.createLevelCard(i, this.levels[i], cardWidth, cardHeight);
+      const card = this.createLevelCard(i, this.visibleLevels[i], cardWidth, cardHeight);
       card.position.set(x, y);
       container.addChild(card);
     }
@@ -216,18 +311,36 @@ export class LevelSelectionUI extends PIXI.Container {
     // Safest is to add it and set renderable=false or just assign. 
     container.addChild(thumbnail);
 
-    // 4. Index (Top Left)
-    const indexStr = (index + 1).toString();
-    const indexText = new PIXI.Text({
-      text: indexStr,
-      style: {
-        fontFamily: 'Arial',
-        fontSize: 24,
-        fill: '#A0A0A0'
-      }
-    });
-    indexText.position.set(12, 8);
-    container.addChild(indexText);
+    // Designer Avatar (Bottom Right)
+    // Only show avatar if NOT viewing "My Levels" (filtering by current user)
+    if (this.filterAuthorId !== CURRENT_USER_ID) {
+      // Mocking a user avatar with a colored circle
+      const avatarRadius = 25;
+      const avatar = new PIXI.Graphics();
+      const colors = [0xFF6B6B, 0x4ECDC4, 0x45B7D1, 0xFFBE76, 0xFF7979, 0xBADC58];
+      const color = colors[index % colors.length];
+
+      avatar.circle(0, 0, avatarRadius);
+      avatar.fill(color);
+      avatar.stroke({ width: 3, color: 0xFFFFFF });
+
+      // Position to slightly protrude from the corner (center closer to the corner)
+      avatar.position.set(width - 4, height - 4);
+
+      // Interaction for avatar
+      avatar.eventMode = 'static';
+      avatar.cursor = 'pointer';
+      avatar.on('pointertap', (e) => {
+        e.stopPropagation();
+        const authorName = levelData.author || `User ${index + 1}`;
+        // Use levelData.authorId if available, otherwise mock one for the demo or use levelData.author
+        const authorId = levelData.authorId || `mock_user_${index}`;
+
+        this.showUserProfile(authorName, authorId, color);
+      });
+
+      container.addChild(avatar);
+    }
 
     // 5. Status (Top Right)
     // Placeholder circle
@@ -243,7 +356,8 @@ export class LevelSelectionUI extends PIXI.Container {
     container.on('pointertap', () => {
       // Use a small threshold (e.g., 10px) to distinguish a legitimate tap from a swipe
       if (this.dragDistance < 10) {
-        this.onSelect(index);
+        // Use visibleLevels!
+        this.onSelect(levelData);
       }
     });
 
@@ -322,8 +436,8 @@ export class LevelSelectionUI extends PIXI.Container {
     this.eventMode = 'static';
 
     this.on('pointerdown', (e) => {
-      // If PenSelectionUI is open, do not handle background swipes
-      if (this.penSelectionUI) return;
+      // If PenSelectionUI or UserProfileCard is open, do not handle background swipes
+      if (this.penSelectionUI || this.userProfileCard) return;
 
       this.isDragging = true;
       this.dragStartX = e.global.x;
@@ -427,7 +541,159 @@ export class LevelSelectionUI extends PIXI.Container {
     }
   }
 
+  private showUserProfile(userName: string, userId: string, color: number): void {
+    if (this.userProfileCard) {
+      this.removeChild(this.userProfileCard);
+      this.userProfileCard.destroy();
+      this.userProfileCard = null;
+    }
+
+    this.userProfileCard = new UserProfileCard(userName, userId, color,
+      () => this.closeUserProfile(),
+      (id) => {
+        this.closeUserProfile();
+        this.setFilterAuthor(id);
+      }
+    );
+    this.addChild(this.userProfileCard);
+  }
+
+  private closeUserProfile(): void {
+    if (this.userProfileCard) {
+      this.removeChild(this.userProfileCard);
+      this.userProfileCard.destroy();
+      this.userProfileCard = null;
+    }
+  }
+
   public setPen(penId: string): void {
     this.currentPenId = penId;
+  }
+
+  // --- Logic for Sorting and Filtering ---
+
+  // --- Logic for Sorting and Filtering ---
+
+  // --- Logic for Sorting and Filtering ---
+
+  private setSortMode(mode: 'latest' | 'popular'): void {
+    if (this.sortMode === mode) return;
+    this.sortMode = mode;
+    this.updateSortButtons();
+    // Maintain current filter
+    this.refreshVisibleLevels();
+  }
+
+  private setFilterAuthor(authorId: string | null): void {
+    if (this.filterAuthorId === authorId) return;
+    this.filterAuthorId = authorId;
+    this.updateSortButtons(); // To update 'Mine' button state
+    this.updateFilterTag();
+    this.refreshVisibleLevels();
+  }
+
+  private updateFilterTag(): void {
+    if (!this.filterFilterTagContainer) return;
+
+    this.filterFilterTagContainer.removeChildren();
+
+    // Only show if filtered and NOT filtering by ME (since ME has its own tab button highlights)
+    if (!this.filterAuthorId || this.filterAuthorId === CURRENT_USER_ID) {
+      this.filterFilterTagContainer.visible = false;
+      return;
+    }
+
+    this.filterFilterTagContainer.visible = true;
+
+    const labelText = `User: ${this.filterAuthorId}`;
+
+    const tagHeight = 32;
+    const padding = 16;
+    const iconSize = 14;
+
+    const bg = new PIXI.Graphics();
+    // Will draw later after text measurement
+
+    const text = new PIXI.Text({
+      text: labelText,
+      style: {
+        fontFamily: 'Arial',
+        fontSize: 14,
+        fill: '#4ECDC4', // Teal text
+        fontWeight: 'bold'
+      }
+    });
+
+    // Close Icon (X)
+    const closeIcon = new PIXI.Text({
+      text: 'x', // Simple x or use icon font if available
+      style: {
+        fontFamily: 'Arial',
+        fontSize: 16,
+        fill: '#4ECDC4',
+        fontWeight: 'bold'
+      }
+    });
+
+    // Layout
+    const textWidth = text.width;
+    const totalWidth = padding + textWidth + 10 + iconSize + padding;
+
+    // Draw Pill Background
+    bg.roundRect(0, -tagHeight / 2, totalWidth, tagHeight, tagHeight / 2);
+    bg.stroke({ width: 1, color: 0x4ECDC4 });
+    bg.fill({ color: 0xFFFFFF }); // White background
+
+    text.position.set(padding, -text.height / 2);
+    closeIcon.position.set(padding + textWidth + 10, -closeIcon.height / 2 - 1); // Adjust vertical alignment
+
+    this.filterFilterTagContainer.addChild(bg);
+    this.filterFilterTagContainer.addChild(text);
+    this.filterFilterTagContainer.addChild(closeIcon);
+
+    // Right Align the whole container to roughly where the old text was (GAME_WIDTH - 200 is center of it?)
+    // Let's align right edge to some margin
+    this.filterFilterTagContainer.pivot.x = totalWidth;
+    // x is already set to GAME_WIDTH - 250 or similar
+
+    // Interaction for the whole tag to close
+    this.filterFilterTagContainer.eventMode = 'static';
+    this.filterFilterTagContainer.cursor = 'pointer';
+    this.filterFilterTagContainer.removeAllListeners(); // Safety
+    this.filterFilterTagContainer.on('pointertap', () => {
+      this.setFilterAuthor(null);
+    });
+  }
+
+  private refreshVisibleLevels(): void {
+    // 1. Filter
+    let list = this.levels;
+    const filterId = this.filterAuthorId;
+    if (filterId) {
+      list = list.filter(l => l.authorId === filterId || (!l.authorId && filterId.startsWith('mock_user')));
+    }
+
+    // 2. Sort
+    // Create a shallow copy to sort
+    list = [...list];
+    if (this.sortMode === 'popular') {
+      list.sort((a, b) => (b.likes || 0) - (a.likes || 0));
+    } else {
+      // Latest (default sort by date)
+      list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    }
+
+    this.visibleLevels = list;
+
+    // 3. Reset Pagination
+    this.currentPage = 0;
+    this.totalPages = Math.ceil(this.visibleLevels.length / this.ITEMS_PER_PAGE);
+    if (this.totalPages === 0) this.totalPages = 1; // Show at least one empty page if no results
+
+    // 4. Re-render
+    // Ensure grid is reset position
+    this.gridContainer.x = 0;
+    this.currentPage = 0;
+    this.setupGrid();
   }
 }
