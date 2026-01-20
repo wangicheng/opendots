@@ -17,10 +17,11 @@ import { Seesaw } from './objects/Seesaw';
 import { ConveyorBelt } from './objects/ConveyorBelt';
 import { Button } from './objects/Button';
 import { PenSelectionUI } from './ui/PenSelectionUI';
+import { ConfirmDialog } from './ui/modals/ConfirmDialog';
 import { type Pen, DEFAULT_PEN } from './data/PenData';
 import { DrawingManager } from './input/DrawingManager';
 import { LevelManager } from './levels/LevelManager';
-import { MockLevelService } from './services/MockLevelService';
+import { MockLevelService, CURRENT_USER_ID } from './services/MockLevelService';
 import type { LevelData } from './levels/LevelSchema';
 import type { Point } from './utils/douglasPeucker';
 import {
@@ -74,10 +75,12 @@ export class Game {
   private currentPen: Pen = DEFAULT_PEN;
   private penSelectionUI: PenSelectionUI | null = null;
   private levelSelectionUI: any = null; // Type will be LevelSelectionUI, using any to avoid import cycles if any
+  private confirmDialog: ConfirmDialog | null = null;
   private uiLayer: PIXI.Container;
   private penBtnContainer: PIXI.Container | null = null;
   private restartBtnContainer: PIXI.Container | null = null;
   private homeBtnContainer: PIXI.Container | null = null;
+  private publishBtnContainer: PIXI.Container | null = null;
 
   // Collision handle mapping for ball detection
   private ballColliderHandles: Map<number, Ball> = new Map();
@@ -195,6 +198,13 @@ export class Game {
 
     // Clear existing dynamic objects
     this.clearLevel();
+
+    // Show/Hide Publish Button
+    if (this.publishBtnContainer) {
+      // Only show if author is current user AND level is NOT published
+      const isMyDraft = levelData.authorId === CURRENT_USER_ID && levelData.isPublished === false;
+      this.publishBtnContainer.visible = isMyDraft;
+    }
 
     // Spawn Balls
     const { blue, pink } = levelData.balls;
@@ -329,6 +339,30 @@ export class Game {
     if (this.penBtnContainer) {
       this.penBtnContainer.visible = true;
     }
+    // We should re-evaluate visibility of publish button based on current level data
+    // But since clearLevel is called at start of loadLevel (where we set visibility), we might want to hide it here temporarily
+    // actually loadLevel calls clearLevel, then sets visibility.
+    // But if we restart? restart calls loadLevel.
+    // So it's fine. 
+    // However, during gameplay, if we stop/reset?
+    // Game doesn't really have a "Stop" button that keeps you in the level but resets state other than restartLevel.
+    // restartLevel calls loadLevel.
+    // Implementation details: clearLevel hides UI elements?
+    // No, setupDrawing enables/disables?
+    // startGame hides penBtnContainer.
+    // clearLevel should RESTORE penBtnContainer.
+    // Should it restore publishBtnContainer?
+    // publishBtnContainer is conditional.
+    // Let's safe-guard:
+    if (this.publishBtnContainer) {
+      // logic determines visibility in loadLevel. Here we hide or leave?
+      // If we just cleared level, we are essentially modifying state.
+      // Usually clearLevel is followed by object setup.
+      // If we are just resetting for replay?
+      // Let's rely on loadLevel to set it.
+      // But if we are in GameState.PLAYING and hit restart, we go to loadLevel.
+      // The issue is if we have other states.
+    }
 
     // Clear balls
     for (const ball of this.balls) {
@@ -440,6 +474,9 @@ export class Game {
       if (this.penBtnContainer) {
         this.penBtnContainer.visible = false;
       }
+      if (this.publishBtnContainer) {
+        this.publishBtnContainer.visible = false;
+      }
     }
   }
 
@@ -491,6 +528,46 @@ export class Game {
       this.showPenSelection();
     });
     this.uiLayer.addChild(this.penBtnContainer);
+
+    // Publish Button (Left of Pen) - Cloud Arrow Up
+    // \uF297
+    const publishX = penX - 20 - 70;
+    this.publishBtnContainer = this.createCanvasButton('\uF297', publishX, btnY, async () => {
+      const currentLevel = this.levelManager.getCurrentLevel();
+      if (!currentLevel) return;
+
+      if (!currentLevel.authorPassed) {
+        this.showConfirmDialog(
+          'You must clear the level first.',
+          () => this.closeConfirmDialog(),
+          () => this.closeConfirmDialog(),
+          { showCancel: false, confirmText: 'OK' }
+        );
+        return;
+      }
+
+      this.showConfirmDialog(
+        'Publish this level?',
+        async () => {
+          this.closeConfirmDialog();
+          await MockLevelService.getInstance().publishLevel(currentLevel.id);
+          this.showConfirmDialog(
+            'Published!',
+            () => this.closeConfirmDialog(),
+            () => this.closeConfirmDialog(),
+            { showCancel: false, confirmText: 'OK' }
+          );
+          if (this.publishBtnContainer) {
+            this.publishBtnContainer.visible = false;
+          }
+          // Ideally reload level data to reflect status, but visible update is enough for UI
+          currentLevel.isPublished = true;
+        },
+        () => this.closeConfirmDialog()
+      );
+    });
+    this.publishBtnContainer.visible = false; // Default hidden
+    this.uiLayer.addChild(this.publishBtnContainer);
   }
 
   /**
@@ -1077,6 +1154,7 @@ export class Game {
     if (this.penBtnContainer) this.penBtnContainer.visible = false;
     if (this.restartBtnContainer) this.restartBtnContainer.visible = false;
     if (this.homeBtnContainer) this.homeBtnContainer.visible = false;
+    if (this.publishBtnContainer) this.publishBtnContainer.visible = false;
   }
 
   private async startLevel(levelData: LevelData): Promise<void> {
@@ -1089,6 +1167,32 @@ export class Game {
     if (this.penBtnContainer) this.penBtnContainer.visible = true;
     if (this.restartBtnContainer) this.restartBtnContainer.visible = true;
     if (this.homeBtnContainer) this.homeBtnContainer.visible = true;
+    // publishBtnContainer visibility is controlled in loadLevel based on level data
+  }
+
+  /**
+   * Show a confirm dialog on canvas
+   */
+  private showConfirmDialog(
+    message: string,
+    onConfirm: () => void,
+    onCancel: () => void,
+    options?: { confirmText?: string; cancelText?: string; showCancel?: boolean }
+  ): void {
+    this.closeConfirmDialog();
+    this.confirmDialog = new ConfirmDialog(message, onConfirm, onCancel, options);
+    this.uiLayer.addChild(this.confirmDialog);
+  }
+
+  /**
+   * Close the confirm dialog
+   */
+  private closeConfirmDialog(): void {
+    if (this.confirmDialog) {
+      this.uiLayer.removeChild(this.confirmDialog);
+      this.confirmDialog.destroy();
+      this.confirmDialog = null;
+    }
   }
 
   /**

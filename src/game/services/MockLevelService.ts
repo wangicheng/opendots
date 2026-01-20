@@ -22,6 +22,7 @@ export class MockLevelService {
     { name: 'Charlie', id: 'user_charlie' },
     { name: 'Me', id: CURRENT_USER_ID }
   ];
+  private publishedLevelIds: Set<string> = new Set();
   private builtinLevels: LevelData[] = [
     level1 as unknown as LevelData,
     level2 as unknown as LevelData,
@@ -55,7 +56,7 @@ export class MockLevelService {
     const rawList = [...this.builtinLevels, ...storedLevels];
 
     // Inject mock metadata for sorting/filtering demo if missing
-    return rawList.map((level, index) => {
+    const list = rawList.map((level, index) => {
       if (!level.author) {
         // Deterministic mock data assignment based on index
         const authorObj = this.authors[index % this.authors.length];
@@ -68,11 +69,44 @@ export class MockLevelService {
           author: authorObj.name,
           authorId: authorObj.id,
           createdAt: this.startTimestamp + timeOffset,
-          likes: Math.floor((Math.sin(index) + 1) * 500) // 0 to 1000
+          likes: Math.floor((Math.sin(index) + 1) * 500), // 0 to 1000
+          isPublished: this.publishedLevelIds.has(level.id) || true, // Default to published for everything else
+          authorPassed: true
         };
       }
       return level;
     });
+
+    // Add a specific "Draft" level for the current user to test the UI
+    const draftLevel: LevelData = {
+      ...this.builtinLevels[0],
+      id: 'draft_level_01',
+      author: 'Me',
+      authorId: CURRENT_USER_ID,
+      createdAt: Date.now(),
+      likes: 0,
+      isPublished: this.publishedLevelIds.has('draft_level_01') || false,
+      authorPassed: false
+    };
+
+    // Add multiple mock levels for the current user to test the 6-item layout
+    const userLevels: LevelData[] = [];
+    for (let i = 1; i <= 5; i++) {
+      const id = `mock_user_level_${i}`;
+      userLevels.push({
+        ...this.builtinLevels[i % this.builtinLevels.length],
+        id: id,
+        author: 'Me',
+        authorId: CURRENT_USER_ID,
+        createdAt: Date.now() - (i * 1000 * 60 * 60), // Decreasing time
+        likes: i * 10,
+        isPublished: this.publishedLevelIds.has(id) || (i > 2), // Some published, some drafts
+        authorPassed: i > 1  // Some tested, some not
+      });
+    }
+
+    // Insert draftLevel and userLevels at the beginning
+    return [draftLevel, ...userLevels, ...list];
   }
 
   /**
@@ -95,6 +129,23 @@ export class MockLevelService {
     stored.push(level);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
     console.log('Level uploaded:', level.id);
+  }
+
+  /**
+   * Publish a level
+   */
+  public async publishLevel(levelId: string): Promise<void> {
+    await new Promise(resolve => setTimeout(resolve, 300));
+    this.publishedLevelIds.add(levelId);
+
+    // Also update storage if it exists there
+    const stored = this.getStoredLevels();
+    const index = stored.findIndex(l => l.id === levelId);
+    if (index >= 0) {
+      stored[index].isPublished = true;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
+    }
+    console.log('Level published:', levelId);
   }
 
   private getStoredLevels(): LevelData[] {

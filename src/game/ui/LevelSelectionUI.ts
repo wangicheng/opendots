@@ -45,7 +45,9 @@ export class LevelSelectionUI extends PIXI.Container {
   private latestBtnText?: PIXI.Text;
   private popularBtnText?: PIXI.Text;
   private mineBtnText?: PIXI.Text;
+
   private filterFilterTagContainer?: PIXI.Container;
+  private createLevelBtn?: PIXI.Container;
 
   // Constants for Layout
   private readonly HEADER_HEIGHT = GAME_HEIGHT / 5;
@@ -148,7 +150,60 @@ export class LevelSelectionUI extends PIXI.Container {
     const penX = listX - 20 - 70;
     penBtn.position.set(penX, btnY);
     penBtn.on('pointertap', () => this.showPenSelection());
+
     this.headerContainer.addChild(penBtn);
+
+    // 4. Floating Action Button (Create Level) - Bottom Right
+    this.createLevelBtn = this.createFloatingActionButton();
+    this.createLevelBtn.visible = false; // Hidden by default
+    this.addChild(this.createLevelBtn);
+  }
+
+  private createFloatingActionButton(): PIXI.Container {
+    const size = 64;
+    const container = new PIXI.Container();
+
+    // Shadow
+    const shadow = new PIXI.Graphics();
+    shadow.circle(0, 0, size / 2);
+    shadow.fill({ color: 0x000000, alpha: 0.3 });
+    shadow.filters = [new PIXI.BlurFilter({ strength: 4 })];
+    shadow.position.set(0, 4);
+    container.addChild(shadow);
+
+    // Button Circle
+    const circle = new PIXI.Graphics();
+    circle.circle(0, 0, size / 2);
+    circle.fill(0x555555); // Dark Gray
+    container.addChild(circle);
+
+    // Plus Icon
+    const plus = new PIXI.Text({
+      text: '+',
+      style: {
+        fontFamily: 'Arial',
+        fontSize: 40,
+        fill: '#FFFFFF',
+        fontWeight: 'bold'
+      }
+    });
+    plus.anchor.set(0.5);
+    plus.position.set(0, 0); // Reset to center
+    container.addChild(plus);
+
+    // Position (Bottom Right, with padding)
+    container.position.set(GAME_WIDTH - 50, GAME_HEIGHT - 50);
+
+    // Interaction
+    container.eventMode = 'static';
+    container.cursor = 'pointer';
+    container.on('pointertap', () => {
+      console.log('Create Level Attempt');
+      // Logic for creating level will go here
+      // For now, maybe show a toast or log
+    });
+
+    return container;
   }
 
   private createSortButton(text: string, x: number, y: number, mode: 'latest' | 'popular'): PIXI.Text {
@@ -190,6 +245,11 @@ export class LevelSelectionUI extends PIXI.Container {
       const isSelected = this.filterAuthorId === CURRENT_USER_ID;
       this.mineBtnText.style.fill = isSelected ? '#555555' : '#AAAAAA';
       this.mineBtnText.style.fontWeight = isSelected ? 'bold' : 'normal';
+    }
+
+    // Toggle FAB visibility based on "Mine" filter
+    if (this.createLevelBtn) {
+      this.createLevelBtn.visible = this.filterAuthorId === CURRENT_USER_ID;
     }
   }
 
@@ -341,6 +401,102 @@ export class LevelSelectionUI extends PIXI.Container {
       });
 
       container.addChild(avatar);
+    }
+
+    // 4.5 Published/Draft Status Overlay
+    if (levelData.authorId === CURRENT_USER_ID && levelData.isPublished === false) {
+      // 1. Dark Mask (Always for unpublished)
+      const darkOverlay = new PIXI.Graphics();
+      darkOverlay.rect(0, 0, width, height);
+      darkOverlay.fill({ color: 0x000000, alpha: 0.2 });
+      container.addChild(darkOverlay);
+
+      // 2. Status Tag (Top Left) - Visual difference
+      const tagContainer = new PIXI.Container();
+      const tagBg = new PIXI.Graphics();
+
+      let labelText = '';
+      let labelColor = 0x000000;
+      let textColor = '#FFFFFF';
+
+      if (levelData.authorPassed) {
+        labelText = 'Draft';
+        labelColor = 0x888888; // Medium Gray for "Ready but not public"
+        textColor = '#FFFFFF';
+      } else {
+        labelText = 'Untested';
+        labelColor = 0xEEEEEE; // Very Light Gray for "Not passed"
+        textColor = '#888888'; // Gray text
+      }
+
+      tagBg.roundRect(0, 0, 80, 24, 12);
+      tagBg.fill(labelColor);
+
+      const tagText = new PIXI.Text({
+        text: labelText,
+        style: {
+          fontFamily: 'Arial',
+          fontSize: 12,
+          fill: textColor,
+          fontWeight: 'bold'
+        }
+      });
+      tagText.anchor.set(0.5);
+      tagText.position.set(40, 12); // Center of bg
+
+      tagContainer.addChild(tagBg);
+      tagContainer.addChild(tagText);
+      tagContainer.position.set(10, 10);
+
+      container.addChild(tagContainer);
+    } else {
+      // Published Level - Show Likes (Top Left)
+      const likesCount = levelData.likes || 0;
+
+      const likesContainer = new PIXI.Container();
+
+      // Calculate width first
+      const numText = new PIXI.Text({
+        text: likesCount.toString(),
+        style: {
+          fontFamily: 'Arial',
+          fontSize: 12,
+          fill: '#FFFFFF',
+          fontWeight: 'bold'
+        }
+      });
+
+      const padding = 10;
+      const iconSize = 14;
+      const gap = 4;
+      const totalWidth = padding + iconSize + gap + numText.width + padding;
+
+      // Background pill (semitransparent black)
+      const bg = new PIXI.Graphics();
+      bg.roundRect(0, 0, totalWidth, 24, 12);
+      bg.fill({ color: 0x000000, alpha: 0.4 });
+      likesContainer.addChild(bg);
+
+      // Heart Icon
+      const heartText = new PIXI.Text({
+        text: '\uF406', // Heart Fill
+        style: {
+          fontFamily: 'bootstrap-icons',
+          fontSize: 16,
+          fill: '#FFFFFF',
+        }
+      });
+      heartText.anchor.set(0.5);
+      heartText.position.set(padding + iconSize / 2, 12);
+      likesContainer.addChild(heartText);
+
+      // Likes Number
+      numText.anchor.set(0, 0.5); // Left align
+      numText.position.set(padding + iconSize + gap, 12);
+      likesContainer.addChild(numText);
+
+      likesContainer.position.set(10, 10);
+      container.addChild(likesContainer);
     }
 
     // 5. Status (Top Right)
@@ -680,8 +836,20 @@ export class LevelSelectionUI extends PIXI.Container {
     // 1. Filter
     let list = this.levels;
     const filterId = this.filterAuthorId;
-    if (filterId) {
-      list = list.filter(l => l.authorId === filterId || (!l.authorId && filterId.startsWith('mock_user')));
+
+    // Default: Filter out unpublished levels (Drafts)
+    // Only show drafts if we are explicitly filtering by CURRENT_USER_ID ("Mine")
+    if (filterId === CURRENT_USER_ID) {
+      list = list.filter(l => l.authorId === filterId);
+    } else if (filterId) {
+      // Filtering by another user -> Match author AND must be published
+      list = list.filter(l => {
+        const isAuthor = l.authorId === filterId || (!l.authorId && filterId.startsWith('mock_user'));
+        return isAuthor && l.isPublished !== false;
+      });
+    } else {
+      // Global list (Latest/Popular) -> Must be published
+      list = list.filter(l => l.isPublished !== false);
     }
 
     // 2. Sort
