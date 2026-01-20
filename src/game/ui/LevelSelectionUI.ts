@@ -243,25 +243,28 @@ export class LevelSelectionUI extends PIXI.Container {
   }
 
   private updateSortButtons(): void {
+    const isMine = this.filterAuthorId === CURRENT_USER_ID;
+
     if (this.latestBtnText) {
-      const isSelected = this.sortMode === 'latest';
+      const isSelected = this.sortMode === 'latest' && !isMine;
       this.latestBtnText.style.fill = isSelected ? '#555555' : '#AAAAAA';
       this.latestBtnText.style.fontWeight = isSelected ? 'bold' : 'normal';
     }
     if (this.popularBtnText) {
-      const isSelected = this.sortMode === 'popular';
+      const isSelected = this.sortMode === 'popular' && !isMine;
       this.popularBtnText.style.fill = isSelected ? '#555555' : '#AAAAAA';
       this.popularBtnText.style.fontWeight = isSelected ? 'bold' : 'normal';
     }
     if (this.mineBtnText) {
-      const isSelected = this.filterAuthorId === CURRENT_USER_ID;
+      // Mine is selected solely based on the filter
+      const isSelected = isMine;
       this.mineBtnText.style.fill = isSelected ? '#555555' : '#AAAAAA';
       this.mineBtnText.style.fontWeight = isSelected ? 'bold' : 'normal';
     }
 
     // Toggle FAB visibility based on "Mine" filter
     if (this.createLevelBtn) {
-      this.createLevelBtn.visible = this.filterAuthorId === CURRENT_USER_ID;
+      this.createLevelBtn.visible = isMine;
     }
   }
 
@@ -745,8 +748,14 @@ export class LevelSelectionUI extends PIXI.Container {
   // --- Logic for Sorting and Filtering ---
 
   private setSortMode(mode: 'latest' | 'popular'): void {
-    if (this.sortMode === mode) {
-      // 如果已經在該模式，但不在第一頁，則回到第一頁
+    // If currently in "Mine" mode, clicking a sort button should exit "Mine" mode (Tab switching behavior)
+    if (this.filterAuthorId === CURRENT_USER_ID) {
+      this.setFilterAuthor(null);
+      // We continue to set the sort mode below, so it becomes "Global + [Mode]"
+    }
+
+    if (this.sortMode === mode && this.filterAuthorId === null) {
+      // 如果已經在該模式，且是全域檢視，但不在第一頁，則回到第一頁
       if (this.currentPage !== 0) {
         this.currentPage = 0;
         this.scrollToPage(0);
@@ -755,7 +764,7 @@ export class LevelSelectionUI extends PIXI.Container {
     }
     this.sortMode = mode;
     this.updateSortButtons();
-    // Maintain current filter
+    // Maintain current filter (unless we just cleared Mine above)
     this.refreshVisibleLevels();
   }
 
