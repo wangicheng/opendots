@@ -40,6 +40,8 @@ export class LevelSelectionUI extends PIXI.Container {
   private sortMode: 'latest' | 'popular' = 'latest';
   private filterAuthorId: string | null = null;
   private visibleLevels: LevelData[] = [];
+  private filterAuthorName: string | null = null;
+  private filterAuthorColor: number = 0x888888;
 
   // UI Elements
   private latestBtnText?: PIXI.Text;
@@ -128,7 +130,11 @@ export class LevelSelectionUI extends PIXI.Container {
 
     // Filter Tag Component (Initially hidden/empty)
     this.filterFilterTagContainer = new PIXI.Container();
-    this.filterFilterTagContainer.position.set(canvasWidth - scale(220), sortY);
+    // Position will be set in updateFilterTag or updateLayout, but let's init it here relative to sort buttons or right aligned
+    // Ideally it sits to the right of "Mine", or replaces the sort buttons?
+    // The requirement says "filter tag... new display method".
+    // I will place it to the right of the "Mine" button for now, or maybe float it.
+    // Let's stick to the previous location logic but refined.
     this.headerContainer.addChild(this.filterFilterTagContainer);
     this.updateFilterTag();
 
@@ -595,6 +601,11 @@ export class LevelSelectionUI extends PIXI.Container {
     this.on('pointerdown', (e) => {
       if (this.penSelectionUI || this.userProfileCard) return;
 
+      // Prevent dragging if clicking in header area
+      const headerHeight = this.getHeaderHeight();
+      const localY = this.toLocal(e.global).y;
+      if (localY < headerHeight) return;
+
       this.isDragging = true;
       this.dragStartX = e.global.x;
       this.dragDistance = 0;
@@ -709,7 +720,7 @@ export class LevelSelectionUI extends PIXI.Container {
       () => this.closeUserProfile(),
       (id) => {
         this.closeUserProfile();
-        this.setFilterAuthor(id);
+        this.setFilterAuthor(id, userName, color);
       }
     );
     this.addChild(this.userProfileCard);
@@ -748,9 +759,21 @@ export class LevelSelectionUI extends PIXI.Container {
     this.refreshVisibleLevels();
   }
 
-  private setFilterAuthor(authorId: string | null): void {
+  private setFilterAuthor(authorId: string | null, authorName?: string, authorColor?: number): void {
     if (this.filterAuthorId === authorId) return;
     this.filterAuthorId = authorId;
+
+    if (authorId) {
+      this.filterAuthorName = authorName || `User ${authorId.slice(0, 4)}`;
+      this.filterAuthorColor = authorColor || 0x888888;
+
+      if (authorId === CURRENT_USER_ID) {
+        this.sortMode = 'latest';
+      }
+    } else {
+      this.filterAuthorName = null;
+    }
+
     this.updateSortButtons(); // To update 'Mine' button state
     this.updateFilterTag();
     this.refreshVisibleLevels();
@@ -761,7 +784,7 @@ export class LevelSelectionUI extends PIXI.Container {
 
     this.filterFilterTagContainer.removeChildren();
 
-    // Only show if filtered and NOT filtering by ME (since ME has its own tab button highlights)
+    // Only show if filtered and NOT filtering by ME
     if (!this.filterAuthorId || this.filterAuthorId === CURRENT_USER_ID) {
       this.filterFilterTagContainer.visible = false;
       return;
@@ -769,61 +792,118 @@ export class LevelSelectionUI extends PIXI.Container {
 
     this.filterFilterTagContainer.visible = true;
 
-    const labelText = `User: ${this.filterAuthorId}`;
+    // --- Configuration ---
+    const tagHeight = scale(40); // Slightly taller for better touch target
+    const paddingLeft = scale(6); // Space for avatar
+    const paddingRight = scale(12); // Space after x
+    const gap = scale(8); // Gap between elements
+    const avatarSize = scale(28);
+    const fontSize = scale(16);
+    const iconSize = scale(14);
 
-    const tagHeight = 32;
-    const padding = 16;
-    const iconSize = 14;
+    // Theme Colors
+    const chipBgColor = 0xFFFFFF;
+    const chipBorderColor = 0xE0E0E0;
+    const textColor = 0x333333;
+    const iconColor = 0x999999;
+    const hoverColor = 0xF5F5F5;
 
+    // --- Components ---
+
+    // 1. Container Background (Pill)
     const bg = new PIXI.Graphics();
-    // Will draw later after text measurement
+    // We'll draw it at the end when we know the width
 
-    const text = new PIXI.Text({
-      text: labelText,
+    // 2. Avatar (Left)
+    const avatar = new PIXI.Graphics();
+    avatar.circle(0, 0, avatarSize / 2);
+    avatar.fill(this.filterAuthorColor);
+    avatar.position.set(paddingLeft + avatarSize / 2, tagHeight / 2);
+
+    // 3. Name Text
+    const nameText = new PIXI.Text({
+      text: this.filterAuthorName || 'Unknown',
       style: {
         fontFamily: 'Arial',
-        fontSize: 14,
-        fill: '#4ECDC4', // Teal text
+        fontSize: fontSize,
+        fill: textColor,
         fontWeight: 'bold'
       }
     });
+    nameText.anchor.set(0, 0.5);
+    nameText.position.set(paddingLeft + avatarSize + gap, tagHeight / 2);
 
-    // Close Icon (X)
+    // 4. Close Icon (Right)
     const closeIcon = new PIXI.Text({
-      text: 'x', // Simple x or use icon font if available
+      text: '✕', // Multiplication X or similar
       style: {
         fontFamily: 'Arial',
-        fontSize: 16,
-        fill: '#4ECDC4',
+        fontSize: scale(14),
+        fill: iconColor,
         fontWeight: 'bold'
       }
     });
+    closeIcon.anchor.set(0.5);
+    // Position set after text measurement
 
-    // Layout
-    const textWidth = text.width;
-    const totalWidth = padding + textWidth + 10 + iconSize + padding;
+    // --- Layout Calculation ---
+    const contentWidth = paddingLeft + avatarSize + gap + nameText.width + gap + iconSize + paddingRight;
 
-    // Draw Pill Background
-    bg.roundRect(0, -tagHeight / 2, totalWidth, tagHeight, tagHeight / 2);
-    bg.stroke({ width: 1, color: 0x4ECDC4 });
-    bg.fill({ color: 0xFFFFFF }); // White background
+    // Draw Background
+    bg.roundRect(0, 0, contentWidth, tagHeight, tagHeight / 2);
+    bg.fill(chipBgColor);
+    bg.stroke({ width: 1, color: chipBorderColor }); // Subtle border
 
-    text.position.set(padding, -text.height / 2);
-    closeIcon.position.set(padding + textWidth + 10, -closeIcon.height / 2 - 1); // Adjust vertical alignment
+    // Position Close Icon
+    closeIcon.position.set(contentWidth - paddingRight - iconSize / 2, tagHeight / 2);
 
+    // Assemble
     this.filterFilterTagContainer.addChild(bg);
-    this.filterFilterTagContainer.addChild(text);
+    this.filterFilterTagContainer.addChild(avatar);
+    this.filterFilterTagContainer.addChild(nameText);
     this.filterFilterTagContainer.addChild(closeIcon);
 
-    // Right Align the whole container to roughly where the old text was (GAME_WIDTH - 200 is center of it?)
-    // Let's align right edge to some margin
-    this.filterFilterTagContainer.pivot.x = totalWidth;
-    // x is already set to GAME_WIDTH - 250 or similar
+    // --- Positioning the entire Tag ---
+    // Place it to the right of the "Mine" button (?) or align Right on screen?
+    // Previous logic was right-aligned. Let's keep it right-aligned but with some margin.
+    // Ideally, it shouldn't overlap with the "Edit/List" buttons on the far right.
+    // The "Edit/List" buttons are at: canvasWidth - scale(20) - btnSize ... roughly canvasWidth - 100
+    // "Mine" button is at center + 220. 
+    // Let's place this Tag to the LEFT of the "Edit/List" buttons to avoid overlap, 
+    // OR center it if there's space.
+    // Given the sort buttons take up center space, let's put it to the Right of "Mine".
 
-    // Interaction for the whole tag to close
+    // Let's calc "Mine" button position roughly:
+    const canvasWidth = getCanvasWidth();
+    const headerHeight = getCanvasHeight() * this.HEADER_HEIGHT_RATIO;
+    const sortY = (headerHeight + scale(10)) / 2;
+    // recalculating sortX same as setupHeader
+    const sortX = canvasWidth / 2 - scale(140);
+    const mineBtnX = sortX + scale(220);
+    // Mine button text width is small.
+
+    // Let's place it at mineBtnX + scale(80) 
+    this.filterFilterTagContainer.x = mineBtnX + scale(80);
+    this.filterFilterTagContainer.y = sortY - tagHeight / 2;
+
+    // --- Interaction ---
     this.filterFilterTagContainer.eventMode = 'static';
     this.filterFilterTagContainer.cursor = 'pointer';
-    this.filterFilterTagContainer.removeAllListeners(); // Safety
+
+    this.filterFilterTagContainer.on('pointerover', () => {
+      bg.clear();
+      bg.roundRect(0, 0, contentWidth, tagHeight, tagHeight / 2);
+      bg.fill(hoverColor);
+      bg.stroke({ width: 1, color: chipBorderColor });
+    });
+
+    this.filterFilterTagContainer.on('pointerout', () => {
+      bg.clear();
+      bg.roundRect(0, 0, contentWidth, tagHeight, tagHeight / 2);
+      bg.fill(chipBgColor);
+      bg.stroke({ width: 1, color: chipBorderColor });
+    });
+
     this.filterFilterTagContainer.on('pointertap', () => {
       this.setFilterAuthor(null);
     });
