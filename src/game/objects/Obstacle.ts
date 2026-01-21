@@ -32,7 +32,7 @@ export class Obstacle {
       thickness
     } = config;
 
-    // Ignore angle for circles
+    // Ignore angle for circles only (c_shape uses angle for rotation)
     const effectiveAngle = type === 'circle' ? 0 : angle;
 
     // Create Pixi.js graphics
@@ -107,10 +107,7 @@ export class Obstacle {
           const D = 2 * (x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2));
 
           if (Math.abs(D) < 0.001) {
-            // Collinear points - no collider for now or simple rect? 
-            // Original code: ignored physics for collinear case? 
-            // Actually original code did: graphics.stroke ... return; 
-            // So no collider was created. Correct.
+            // Collinear points
             return;
           }
 
@@ -152,11 +149,12 @@ export class Obstacle {
 
             const pCenter = physicsWorld.toPhysics(segX, segY);
 
+            // Use pCenter direct relative coordinates (offset from body center)
             const colliderDesc = R.ColliderDesc.cuboid(
               (segLen / 2) / SCALE,
               (thickness / 2) / SCALE
             )
-              .setTranslation(pCenter.x - physicsPos.x, pCenter.y - physicsPos.y)
+              .setTranslation(pCenter.x, pCenter.y)
               .setRotation(-segAngle)
               .setFriction(OBSTACLE_FRICTION)
               .setRestitution(OBSTACLE_RESTITUTION)
@@ -179,7 +177,7 @@ export class Obstacle {
             const endPos = physicsWorld.toPhysics(endX, endY);
 
             const startCollider = R.ColliderDesc.ball(capRadius / SCALE)
-              .setTranslation(startPos.x - physicsPos.x, startPos.y - physicsPos.y)
+              .setTranslation(startPos.x, startPos.y)
               .setFriction(OBSTACLE_FRICTION)
               .setRestitution(OBSTACLE_RESTITUTION)
               .setDensity(OBSTACLE_DENSITY)
@@ -188,7 +186,7 @@ export class Obstacle {
             this.colliders.push(world.createCollider(startCollider, this.body));
 
             const endCollider = R.ColliderDesc.ball(capRadius / SCALE)
-              .setTranslation(endPos.x - physicsPos.x, endPos.y - physicsPos.y)
+              .setTranslation(endPos.x, endPos.y)
               .setFriction(OBSTACLE_FRICTION)
               .setRestitution(OBSTACLE_RESTITUTION)
               .setDensity(OBSTACLE_DENSITY)
@@ -307,6 +305,7 @@ export class Obstacle {
           const isCCW = relA2 < relA3;
 
           graphics.clear();
+          // Draw relative to center (centerX, centerY are relative)
           graphics.arc(centerX, centerY, arcRadius, angle1, angle3, !isCCW);
           graphics.stroke({ width: thickness, color: OBSTACLE_COLOR, cap: cap === 'round' ? 'round' : 'butt', join: 'round' });
 
