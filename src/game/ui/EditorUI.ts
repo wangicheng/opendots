@@ -34,6 +34,10 @@ export class EditorUI extends PIXI.Container {
   private playRestartBtn: PIXI.Container | null = null;
   private playPenBtn: PIXI.Container | null = null;
 
+  // State tracking for layout restoration
+  private lastHasSelection: boolean = false;
+  private lastIsBall: boolean = false;
+
   constructor(
     onClose: () => void,
     onToggleMode: (mode: 'edit' | 'play') => void,
@@ -52,13 +56,12 @@ export class EditorUI extends PIXI.Container {
     this.onRestart = onRestart;
     this.onPen = onPen;
 
-    this.setupUI();
+    this.updateLayout();
   }
 
-  private setupUI(): void {
+  public updateLayout(): void {
+    this.removeChildren();
     const width = getCanvasWidth();
-
-
 
     const btnY = scale(36);
     const btnSize = scale(52);
@@ -85,8 +88,8 @@ export class EditorUI extends PIXI.Container {
     const copyX = deleteX - btnSpacing - btnSize;
     this.copyBtn = this.createButton('\uF759', copyX, btnY, this.onCopy, this.toolsContainer);
 
-    // Initial tool state
-    this.updateTools(false, false);
+    // Restore tool state
+    this.updateTools(this.lastHasSelection, this.lastIsBall);
 
     // Bottom Bar (Tools)
     this.createBottomBar();
@@ -105,10 +108,8 @@ export class EditorUI extends PIXI.Container {
     const penX = restartX - btnSpacing - btnSize;
     this.playPenBtn = this.createButton('\uF604', penX, btnY, this.onPen);
 
-    // Initially hide play buttons
-    this.playHomeBtn.visible = false;
-    this.playRestartBtn.visible = false;
-    this.playPenBtn.visible = false;
+    // Restore UI State (Visibility)
+    this.setUIState(this.currentMode);
   }
 
   private createToggle(x: number, y: number): void {
@@ -255,6 +256,10 @@ export class EditorUI extends PIXI.Container {
   }
 
   public updateTools(hasSelection: boolean, isBall: boolean): void {
+    // Save state for layout restoration
+    this.lastHasSelection = hasSelection;
+    this.lastIsBall = isBall;
+
     if (!this.copyBtn || !this.deleteBtn) return;
 
     // Copy/Delete Rules:

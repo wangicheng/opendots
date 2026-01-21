@@ -481,7 +481,7 @@ export class LevelSelectionUI extends PIXI.Container {
       });
 
       const padding = scale(10);
-      const iconSize = scale(14);
+      const iconSize = scale(16);
       const gap = scale(4);
       const totalWidth = padding + iconSize + gap + numText.width + padding;
       const pillHeight = scale(24);
@@ -498,8 +498,9 @@ export class LevelSelectionUI extends PIXI.Container {
         text: '\uF406', // Heart Fill
         style: {
           fontFamily: 'bootstrap-icons',
-          fontSize: scale(16),
+          fontSize: iconSize,
           fill: '#FFFFFF',
+          padding: scale(4)
         }
       });
       heartText.anchor.set(0.5);
@@ -511,7 +512,7 @@ export class LevelSelectionUI extends PIXI.Container {
       numText.position.set(padding + iconSize + gap, pillHeight / 2);
       likesContainer.addChild(numText);
 
-      likesContainer.position.set(scale(10), scale(10));
+      likesContainer.position.set(scale(12), scale(12));
       container.addChild(likesContainer);
     }
 

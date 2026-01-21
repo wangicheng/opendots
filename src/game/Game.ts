@@ -221,6 +221,11 @@ export class Game {
     if (this.levelSelectionUI) {
       this.levelSelectionUI.updateLayout();
     }
+
+    // Update editor UI if active
+    if (this.editorUI) {
+      this.editorUI.updateLayout();
+    }
   }
 
   /**
