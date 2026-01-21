@@ -40,6 +40,12 @@ import {
   getCanvasHeight,
   getScaleFactor,
   scale,
+  EDITOR_SELECTION_COLOR,
+  EDITOR_SELECTION_ALPHA,
+  EDITOR_DRAG_ALPHA,
+  EDITOR_OUTLINE_WIDTH_NORMAL,
+  EDITOR_OUTLINE_WIDTH_FOCUSED,
+  CONVEYOR_BELT_HEIGHT,
 } from './config';
 import { EffectManager } from './effects/EffectManager';
 
@@ -91,7 +97,6 @@ export class Game {
   private editingLevel: LevelData | null = null;
   private editorObjects: { container: PIXI.Container, data: any, type: string }[] = [];
   private selectedObject: { container: PIXI.Container, data: any, type: string } | null = null;
-  private selectionEffect: PIXI.Graphics | null = null;
 
   // Collision handle mapping for ball detection
   private ballColliderHandles: Map<number, Ball> = new Map();
@@ -1755,11 +1760,6 @@ export class Game {
         const newY = initialObjY + dy;
 
         container.position.set(newX, newY);
-
-        // Update selection effect position if moving selected object
-        if (this.selectedObject && this.selectedObject.container === container && this.selectionEffect) {
-          this.selectionEffect.position.set(newX, newY);
-        }
       }
     };
 
@@ -1782,7 +1782,7 @@ export class Game {
       // Support both FederatedPointerEvent and simpler data objects
       dragData = eventData.data || eventData;
 
-      container.alpha = 0.5;
+      container.alpha = EDITOR_DRAG_ALPHA;
       container.cursor = 'grabbing';
 
       // Ensure we have access to global point
@@ -1843,26 +1843,15 @@ export class Game {
   }
 
   private selectObject(container: PIXI.Container, data: any, type: string) {
-    this.selectedObject = { container, data, type };
-
-    // Create visual feedback
-    if (this.selectionEffect) {
-      this.selectionEffect.destroy();
-      this.selectionEffect = null;
+    // Deselect previous
+    if (this.selectedObject) {
+      this.updateEditorOutline(this.selectedObject.container, this.selectedObject.type, this.selectedObject.data, EDITOR_OUTLINE_WIDTH_NORMAL, EDITOR_SELECTION_COLOR);
     }
 
-    const bounds = container.getLocalBounds();
-    this.selectionEffect = new PIXI.Graphics();
-    this.selectionEffect.rect(bounds.x - 5, bounds.y - 5, bounds.width + 10, bounds.height + 10);
-    this.selectionEffect.stroke({ width: 2, color: 0x00FF00 }); // Green selection box
-    this.selectionEffect.position.copyFrom(container.position);
-    this.selectionEffect.scale.copyFrom(container.scale);
-    // Add to gameContainer but above object? Or just add to UI layer?
-    // Adding to gameContainer ensures it moves with camera/scale if relevant, but here we are in editor.
-    // Actually, container coordinates are relative to gameContainer.
-    // But container itself is transformed.
-    // Safer to add selectionEffect as generic child of gameContainer and sync pos.
-    this.gameContainer.addChild(this.selectionEffect);
+    this.selectedObject = { container, data, type };
+
+    // Create visual feedback (Thick outline)
+    this.updateEditorOutline(container, type, data, EDITOR_OUTLINE_WIDTH_FOCUSED, EDITOR_SELECTION_COLOR);
 
     // Update Editor UI
     if (this.editorUI) {
@@ -1872,13 +1861,117 @@ export class Game {
   }
 
   private deselectObject() {
-    this.selectedObject = null;
-    if (this.selectionEffect) {
-      this.selectionEffect.destroy();
-      this.selectionEffect = null;
+    if (this.selectedObject) {
+      this.updateEditorOutline(this.selectedObject.container, this.selectedObject.type, this.selectedObject.data, EDITOR_OUTLINE_WIDTH_NORMAL, EDITOR_SELECTION_COLOR);
     }
+    this.selectedObject = null;
     if (this.editorUI) {
       this.editorUI.updateTools(false, false);
+    }
+  }
+
+  private updateEditorOutline(visual: PIXI.Container, type: string, data: any, thickness: number, color: number) {
+    let outline = visual.getChildByName('__editor_outline__') as PIXI.Graphics;
+    if (!outline) {
+      outline = new PIXI.Graphics();
+      outline.name = '__editor_outline__';
+      visual.addChild(outline);
+    }
+    outline.clear();
+
+    const drawShape = (g: PIXI.Graphics, t: string, d: any) => {
+      switch (t) {
+        case 'ball_blue':
+        case 'ball_pink':
+          g.circle(0, 0, BALL_RADIUS);
+          break;
+        case 'obstacle':
+        case 'falling':
+          {
+            const subType = d.type || 'rectangle';
+            if (subType === 'circle') {
+              g.circle(0, 0, d.radius || d.width / 2);
+            } else if (subType === 'triangle') {
+              const w = d.width;
+              const h = d.height;
+              g.poly([0, -h / 2, w / 2, h / 2, -w / 2, h / 2]);
+            } else if (subType === 'c_shape') {
+              if (d.points && d.points.length === 3 && d.thickness) {
+                const p1 = d.points[0], p2 = d.points[1], p3 = d.points[2];
+                const x1 = p1.x, y1 = p1.y, x2 = p2.x, y2 = p2.y, x3 = p3.x, y3 = p3.y;
+                const D = 2 * (x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2));
+                if (Math.abs(D) > 0.001) {
+                  const centerX = ((x1 * x1 + y1 * y1) * (y2 - y3) + (x2 * x2 + y2 * y2) * (y3 - y1) + (x3 * x3 + y3 * y3) * (y1 - y2)) / D;
+                  const centerY = ((x1 * x1 + y1 * y1) * (x3 - x2) + (x2 * x2 + y2 * y2) * (x1 - x3) + (x3 * x3 + y3 * y3) * (x2 - x1)) / D;
+                  const arcRadius = Math.sqrt(Math.pow(x1 - centerX, 2) + Math.pow(y1 - centerY, 2));
+                  let angle1 = Math.atan2(y1 - centerY, x1 - centerX);
+                  let angle2 = Math.atan2(y2 - centerY, x2 - centerX);
+                  let angle3 = Math.atan2(y3 - centerY, x3 - centerX);
+                  const normalize = (a: number) => (a + 2 * Math.PI) % (2 * Math.PI);
+                  const isCCW = normalize(angle2 - angle1) < normalize(angle3 - angle1);
+                  g.arc(centerX, centerY, arcRadius, angle1, angle3, !isCCW);
+                } else {
+                  // Collinear
+                  g.moveTo(p1.x, p1.y);
+                  g.lineTo(p2.x, p2.y);
+                  g.lineTo(p3.x, p3.y);
+                }
+              }
+            } else {
+              const w = d.width || 100;
+              const h = d.height || 100;
+              g.rect(-w / 2, -h / 2, w, h);
+            }
+          }
+          break;
+        case 'net':
+          g.roundRect(-d.width / 2, -d.height / 2, d.width, d.height, 5);
+          break;
+        case 'conveyor':
+          g.rect(-d.width / 2, -CONVEYOR_BELT_HEIGHT / 2, d.width, CONVEYOR_BELT_HEIGHT);
+          break;
+        case 'ice':
+        case 'seesaw':
+          g.rect(-d.width / 2, -d.height / 2, d.width, d.height);
+          break;
+        case 'button':
+          // T-shape path
+          g.poly([
+            -16, -20,  // Top-left
+            16, -20,   // Top-right
+            16, -15,   // Top-bar bottom-right
+            2.5, -15,  // stem right top
+            2.5, 20,   // stem bottom-right
+            -2.5, 20,  // stem bottom-left
+            -2.5, -15, // stem left top
+            -16, -15   // Top-bar bottom-left
+          ]);
+          g.closePath();
+          break;
+        case 'laser':
+          {
+            const dx = d.x2 - d.x1;
+            const dy = d.y2 - d.y1;
+            const len = Math.sqrt(dx * dx + dy * dy);
+            const lh = 32; // Standard laser height
+            g.rect(-len / 2, -lh / 2, len, lh);
+          }
+          break;
+      }
+    };
+
+    drawShape(outline, type, data);
+
+    if (type === 'obstacle' && data.type === 'c_shape') {
+      outline.stroke({
+        width: data.thickness + thickness,
+        color: color,
+        alpha: EDITOR_SELECTION_ALPHA,
+        cap: 'round',
+        join: 'round'
+      });
+    } else {
+      outline.stroke({ width: thickness, color: color, alpha: EDITOR_SELECTION_ALPHA });
     }
   }
 
@@ -1894,6 +1987,9 @@ export class Game {
 
     visual.position.set(posX * scaleFactor, posY * scaleFactor);
     visual.scale.set(scaleFactor);
+
+    // Initial Outline (Thin)
+    this.updateEditorOutline(visual, type, data, EDITOR_OUTLINE_WIDTH_NORMAL, EDITOR_SELECTION_COLOR);
 
     this.makeDraggable(visual, (x, y) => {
       if (type === 'laser') {

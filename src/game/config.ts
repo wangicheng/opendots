@@ -170,6 +170,13 @@ export const COLLISION_GROUP = {
   BUTTON: 0x1000_FFFF,          // Group 12, sensor for button press detection
 };
 
+// Editor Selection
+export const EDITOR_SELECTION_COLOR = 0x2196F3;
+export const EDITOR_SELECTION_ALPHA = 0.5;
+export const EDITOR_DRAG_ALPHA = 0.8;
+export const EDITOR_OUTLINE_WIDTH_NORMAL = 2; // Fixed pixels
+export const EDITOR_OUTLINE_WIDTH_FOCUSED = 5; // Fixed pixels
+
 // Old CATEGORY export for backward compatibility (deprecated)
 export const CATEGORY = {
   DEFAULT: 0x0001,
