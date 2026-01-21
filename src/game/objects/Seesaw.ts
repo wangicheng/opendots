@@ -33,6 +33,9 @@ export class Seesaw {
 
     // Create visuals
     this.graphics = Seesaw.createVisual(config);
+    // Force container to 0,0 locally because we update children to absolute world coordinates
+    this.graphics.position.set(0, 0);
+
     // Retrieve references so we can update them
     this.plankGraphics = this.graphics.children[0] as PIXI.Graphics;
     this.pivotGraphics = this.graphics.children[1] as PIXI.Graphics;
@@ -156,18 +159,21 @@ export class Seesaw {
   }
 
   static createVisual(config: SeesawConfig): PIXI.Container {
-    const { width, height } = config;
+    const { width, height, x, y, angle = 0 } = config;
 
     // Create main container (rotation handled by parent in editor)
     const graphics = new PIXI.Container();
+    graphics.position.set(x, y);
 
     // Create Plank Graphics
     const plankGraphics = new PIXI.Graphics();
     plankGraphics.rect(-width / 2, -height / 2, width, height);
     plankGraphics.fill({ color: SEESAW_COLOR });
 
-    // Set initial position for plank (rotation handled by parent container)
+    // Set initial position for plank
     plankGraphics.position.set(0, 0);
+    // Set initial rotation for preview
+    plankGraphics.rotation = (angle * Math.PI) / 180;
 
     // Create Pivot (Axis) Graphics
     const pivotGraphics = new PIXI.Graphics();
