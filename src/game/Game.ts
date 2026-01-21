@@ -1652,53 +1652,25 @@ export class Game {
 
   private loadEditorLevel(data: LevelData): void {
     this.editorObjects = [];
-    const scaleFactor = getScaleFactor();
-
-    // Helper to add editable object
-    const addEditable = (container: PIXI.Container, dataObj: any, type: string, x?: number, y?: number) => {
-      const px = (x !== undefined ? x : dataObj.x);
-      const py = (y !== undefined ? y : dataObj.y);
-      container.position.set(px * scaleFactor, py * scaleFactor);
-      container.scale.set(scaleFactor);
-
-      this.makeDraggable(container, (newX, newY) => {
-        // Handle updates
-        if (type === 'laser') {
-          const dx = newX - (dataObj.x1 + dataObj.x2) / 2;
-          const dy = newY - (dataObj.y1 + dataObj.y2) / 2;
-          dataObj.x1 += dx;
-          dataObj.y1 += dy;
-          dataObj.x2 += dx;
-          dataObj.y2 += dy;
-        } else {
-          // standard x/y
-          dataObj.x = newX;
-          dataObj.y = newY;
-        }
-      }, scaleFactor, dataObj, type);
-
-      this.gameContainer.addChild(container);
-      this.editorObjects.push({ container, data: dataObj, type });
-    };
 
     // Balls (Editable)
     const blue = Ball.createVisual(0, 0, 'blue');
-    addEditable(blue, data.balls.blue, 'ball_blue');
+    this.setupEditorObject(blue, data.balls.blue, 'ball_blue');
 
     const pink = Ball.createVisual(0, 0, 'pink');
-    addEditable(pink, data.balls.pink, 'ball_pink');
+    this.setupEditorObject(pink, data.balls.pink, 'ball_pink');
 
     // Obstacles
     data.obstacles.forEach(obs => {
       const vis = Obstacle.createVisual(obs);
-      addEditable(vis, obs, 'obstacle');
+      this.setupEditorObject(vis, obs, 'obstacle');
     });
 
     // Falling Objects
     if (data.fallingObjects) {
       data.fallingObjects.forEach(obj => {
         const vis = FallingObject.createVisual(obj);
-        addEditable(vis, obj, 'falling');
+        this.setupEditorObject(vis, obj, 'falling');
       });
     }
 
@@ -1706,7 +1678,7 @@ export class Game {
     if (data.nets) {
       data.nets.forEach(net => {
         const vis = Net.createVisual(net);
-        addEditable(vis, net, 'net');
+        this.setupEditorObject(vis, net, 'net');
       });
     }
 
@@ -1714,7 +1686,7 @@ export class Game {
     if (data.iceBlocks) {
       data.iceBlocks.forEach(ice => {
         const vis = IceBlock.createVisual(ice);
-        addEditable(vis, ice, 'ice');
+        this.setupEditorObject(vis, ice, 'ice');
       });
     }
 
@@ -1722,9 +1694,7 @@ export class Game {
     if (data.lasers && this.laserTexture) {
       data.lasers.forEach(laser => {
         const vis = Laser.createVisual(laser, this.laserTexture!);
-        const cx = (laser.x1 + laser.x2) / 2;
-        const cy = (laser.y1 + laser.y2) / 2;
-        addEditable(vis, laser, 'laser', cx, cy);
+        this.setupEditorObject(vis, laser, 'laser');
       });
     }
 
@@ -1732,7 +1702,7 @@ export class Game {
     if (data.seesaws) {
       data.seesaws.forEach(seesaw => {
         const vis = Seesaw.createVisual(seesaw);
-        addEditable(vis, seesaw, 'seesaw');
+        this.setupEditorObject(vis, seesaw, 'seesaw');
       });
     }
 
@@ -1740,7 +1710,7 @@ export class Game {
     if (data.conveyors) {
       data.conveyors.forEach(conveyor => {
         const vis = ConveyorBelt.createVisual(conveyor);
-        addEditable(vis, conveyor, 'conveyor');
+        this.setupEditorObject(vis, conveyor, 'conveyor');
       });
     }
 
@@ -1748,10 +1718,11 @@ export class Game {
     if (data.buttons) {
       data.buttons.forEach(button => {
         const vis = Button.createVisual(button);
-        addEditable(vis, button, 'button');
+        this.setupEditorObject(vis, button, 'button');
       });
     }
   }
+
 
   private makeDraggable(
     container: PIXI.Container,
@@ -1911,6 +1882,37 @@ export class Game {
     }
   }
 
+  private setupEditorObject(visual: PIXI.Container, data: any, type: string, initialEventData?: any) {
+    const scaleFactor = getScaleFactor();
+
+    let posX = data.x;
+    let posY = data.y;
+    if (type === 'laser') {
+      posX = (data.x1 + data.x2) / 2;
+      posY = (data.y1 + data.y2) / 2;
+    }
+
+    visual.position.set(posX * scaleFactor, posY * scaleFactor);
+    visual.scale.set(scaleFactor);
+
+    this.makeDraggable(visual, (x, y) => {
+      if (type === 'laser') {
+        const dx = x - (data.x1 + data.x2) / 2;
+        const dy = y - (data.y1 + data.y2) / 2;
+        data.x1 += dx;
+        data.y1 += dy;
+        data.x2 += dx;
+        data.y2 += dy;
+      } else {
+        data.x = x;
+        data.y = y;
+      }
+    }, scaleFactor, data, type, initialEventData);
+
+    this.gameContainer.addChild(visual);
+    this.editorObjects.push({ container: visual, data, type });
+  }
+
   private copySelectedObject() {
     if (!this.selectedObject || !this.editingLevel) return;
     const { data, type } = this.selectedObject;
@@ -1919,33 +1921,65 @@ export class Game {
     if (type === 'ball_blue' || type === 'ball_pink') return;
 
     // Clone data
-    const newData = { ...data };
-    newData.x += 20; // Offset slightly
-    newData.y += 20;
+    const newData = JSON.parse(JSON.stringify(data));
 
-    // Add to level data
+    let visual: PIXI.Container | null = null;
+    let list: any[] | null = null;
+
     if (type === 'obstacle') {
-      this.editingLevel.obstacles.push(newData);
+      list = this.editingLevel.obstacles;
+      visual = Obstacle.createVisual(newData);
+    } else if (type === 'falling') {
+      if (!this.editingLevel.fallingObjects) this.editingLevel.fallingObjects = [];
+      list = this.editingLevel.fallingObjects;
+      visual = FallingObject.createVisual(newData);
+    } else {
+      // Special objects
+      switch (type) {
+        case 'conveyor':
+          if (!this.editingLevel.conveyors) this.editingLevel.conveyors = [];
+          list = this.editingLevel.conveyors;
+          visual = ConveyorBelt.createVisual(newData);
+          break;
+        case 'net':
+          if (!this.editingLevel.nets) this.editingLevel.nets = [];
+          list = this.editingLevel.nets;
+          visual = Net.createVisual(newData);
+          break;
+        case 'ice':
+          if (!this.editingLevel.iceBlocks) this.editingLevel.iceBlocks = [];
+          list = this.editingLevel.iceBlocks;
+          visual = IceBlock.createVisual(newData);
+          break;
+        case 'laser':
+          if (!this.editingLevel.lasers) this.editingLevel.lasers = [];
+          list = this.editingLevel.lasers;
+          if (this.laserTexture) {
+            visual = Laser.createVisual(newData, this.laserTexture);
+          }
+          break;
+        case 'seesaw':
+          if (!this.editingLevel.seesaws) this.editingLevel.seesaws = [];
+          list = this.editingLevel.seesaws;
+          visual = Seesaw.createVisual(newData);
+          break;
+        case 'button':
+          if (!this.editingLevel.buttons) this.editingLevel.buttons = [];
+          list = this.editingLevel.buttons;
+          visual = Button.createVisual(newData);
+          break;
+      }
+    }
 
-      // Create Visual
-      const vis = Obstacle.createVisual(newData);
-      const scaleFactor = getScaleFactor();
-      vis.position.set(newData.x * scaleFactor, newData.y * scaleFactor);
-      vis.scale.set(scaleFactor);
-
-      this.makeDraggable(vis, (x, y) => {
-        newData.x = x;
-        newData.y = y;
-      }, scaleFactor, newData, type);
-
-      this.gameContainer.addChild(vis);
-      const newObj = { container: vis, data: newData, type };
-      this.editorObjects.push(newObj);
+    if (visual && list) {
+      list.push(newData);
+      this.setupEditorObject(visual, newData, type);
 
       // Select new object
-      this.selectObject(vis, newData, type);
+      this.selectObject(visual, newData, type);
     }
   }
+
 
   private deleteSelectedObject() {
     if (!this.selectedObject || !this.editingLevel) return;
@@ -2133,38 +2167,12 @@ export class Game {
 
     if (visual && newObj && list) {
       list.push(newObj);
-
-      let posX = newObj.x;
-      let posY = newObj.y;
-      if (objTypeTag === 'laser') {
-        posX = (newObj.x1 + newObj.x2) / 2;
-        posY = (newObj.y1 + newObj.y2) / 2;
-      }
-
-      visual.position.set(posX * scaleFactor, posY * scaleFactor);
-      visual.scale.set(scaleFactor);
-
-      this.makeDraggable(visual, (x, y) => {
-        if (objTypeTag === 'laser') {
-          // For laser, x,y is just visual pos. We need to shift endpoints.
-          const dx = x - (newObj.x1 + newObj.x2) / 2;
-          const dy = y - (newObj.y1 + newObj.y2) / 2;
-          newObj.x1 += dx;
-          newObj.y1 += dy;
-          newObj.x2 += dx;
-          newObj.y2 += dy;
-        } else {
-          newObj.x = x;
-          newObj.y = y;
-        }
-      }, scaleFactor, newObj, objTypeTag, initialEventData);
-
-      this.gameContainer.addChild(visual);
-      this.editorObjects.push({ container: visual, data: newObj, type: objTypeTag });
+      this.setupEditorObject(visual, newObj, objTypeTag, initialEventData);
 
       // Auto select
       this.selectObject(visual, newObj, objTypeTag);
     }
+
   }
 
   private async toggleTestPlay() {
