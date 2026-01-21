@@ -1586,10 +1586,15 @@ export class Game {
     this.deselectObject();
 
     // Disable Gameplay interactions
-    // Disable Gameplay interactions
     if (this.drawingManager) {
       this.drawingManager.disable(this.interactionArea);
     }
+
+    // Enable background deselection in editor mode
+    this.interactionArea.eventMode = 'static';
+    this.interactionArea.on('pointerdown', () => {
+      this.deselectObject();
+    });
 
     // Hide Play UI
     if (this.penBtnContainer) this.penBtnContainer.visible = false;
@@ -1840,7 +1845,20 @@ export class Game {
       window.addEventListener('pointercancel', endDrag);
     };
 
-    container.on('pointerdown', startDrag);
+    container.on('pointerdown', (e) => {
+      const isSelected = this.selectedObject && this.selectedObject.container === container;
+      if (isSelected) {
+        startDrag(e);
+      } else {
+        // Select it
+        if (dataObj && type) {
+          this.selectObject(container, dataObj, type);
+        }
+        if (e.stopPropagation) {
+          e.stopPropagation();
+        }
+      }
+    });
 
     // Initial Drag (from UI spawn)
     if (initialEventData) {

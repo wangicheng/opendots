@@ -112,7 +112,7 @@ export class EditorUI extends PIXI.Container {
   }
 
   private createToggle(x: number, y: number): void {
-    const width = scale(160);
+    const width = scale(240);
     const height = scale(40);
     const radius = scale(20); // Max rounded corners
 
@@ -160,7 +160,7 @@ export class EditorUI extends PIXI.Container {
     // Clear previous dynamic graphics
     this.toggleContainer.removeChildren();
 
-    const w = scale(160);
+    const w = scale(240);
     const h = scale(40);
     const r = scale(20);
 
@@ -202,13 +202,13 @@ export class EditorUI extends PIXI.Container {
     // Text
     const editStyle: Partial<PIXI.TextStyle> = {
       fontFamily: 'Arial',
-      fontSize: scale(16),
+      fontSize: scale(20),
       fill: this.currentMode === 'edit' ? '#FFFFFF' : '#555555',
       fontWeight: 'bold' as PIXI.TextStyleFontWeight
     };
     const playStyle: Partial<PIXI.TextStyle> = {
       fontFamily: 'Arial',
-      fontSize: scale(16),
+      fontSize: scale(20),
       fill: this.currentMode === 'play' ? '#FFFFFF' : '#555555',
       fontWeight: 'bold' as PIXI.TextStyleFontWeight
     };
@@ -316,10 +316,12 @@ export class EditorUI extends PIXI.Container {
     const width = getCanvasWidth();
     const height = getCanvasHeight();
     const barHeight = scale(140);
+    const tabHeight = scale(40);
 
     this.bottomBar = new PIXI.Graphics();
-    this.bottomBar.rect(0, height - barHeight, width, barHeight);
-    this.bottomBar.fill({ color: 0x333333, alpha: 0.5 });
+    // Start background below tabs
+    this.bottomBar.rect(0, height - barHeight + tabHeight, width, barHeight - tabHeight);
+    this.bottomBar.fill({ color: 0x333333, alpha: 0.8 });
     this.addChild(this.bottomBar);
 
     // Tabs
@@ -327,7 +329,7 @@ export class EditorUI extends PIXI.Container {
 
     // Items Area
     this.itemsContainer = new PIXI.Container();
-    this.itemsContainer.position.set(0, height - barHeight + scale(40)); // Below tabs
+    this.itemsContainer.position.set(0, height - barHeight + tabHeight); // Below tabs
     this.addChild(this.itemsContainer);
 
     this.renderItems();
@@ -343,7 +345,7 @@ export class EditorUI extends PIXI.Container {
     this.addChild(this.tabsContainer);
 
     const categories: ('obstacle' | 'falling' | 'special')[] = ['obstacle', 'falling', 'special'];
-    const tabWidth = getCanvasWidth() / 3;
+    const tabWidth = scale(80);
     const tabHeight = scale(40);
 
     categories.forEach((cat, index) => {
@@ -355,27 +357,41 @@ export class EditorUI extends PIXI.Container {
       const bg = new PIXI.Graphics();
       if (isActive) {
         bg.rect(0, 0, tabWidth, tabHeight);
-        bg.fill(0xEEEEEE);
+        bg.fill({ color: 0x333333, alpha: 0.8 }); // Match bottom bar color
       } else {
         bg.rect(0, 0, tabWidth, tabHeight);
-        bg.fill({ color: 0xFFFFFF, alpha: 0.5 });
-        // Bottom border
-        bg.moveTo(0, tabHeight);
-        bg.lineTo(tabWidth, tabHeight);
-        bg.stroke({ color: 0xCCCCCC, width: 1 });
+        bg.fill({ color: 0x555555, alpha: 0.8 });
       }
       tab.addChild(bg);
 
-      // Text
-      const text = new PIXI.Text(cat.charAt(0).toUpperCase() + cat.slice(1), {
-        fontFamily: 'Arial',
-        fontSize: scale(16),
-        fill: isActive ? '#333333' : '#888888',
-        fontWeight: isActive ? 'bold' : 'normal'
-      });
-      text.anchor.set(0.5);
-      text.position.set(tabWidth / 2, tabHeight / 2);
-      tab.addChild(text);
+      // Icons instead of text
+      const icon = new PIXI.Graphics();
+      const iconSize = scale(20);
+      const color = 0xCCCCCC;
+
+      if (cat === 'obstacle') {
+        // Solid Square
+        icon.rect(-iconSize / 2, -iconSize / 2, iconSize, iconSize);
+        icon.fill(color);
+      } else if (cat === 'falling') {
+        // Hollow Square
+        const strokeWidth = scale(2.5);
+        icon.rect(-iconSize / 2 + strokeWidth / 2, -iconSize / 2 + strokeWidth / 2, iconSize - strokeWidth, iconSize - strokeWidth);
+        icon.stroke({ color, width: strokeWidth });
+      } else if (cat === 'special') {
+        // Simple Conveyor Icon
+        const cw = iconSize;
+        const ch = iconSize * 0.5;
+        const cr = ch / 2;
+        icon.roundRect(-cw / 2, -ch / 2, cw, ch, cr);
+        icon.stroke({ color, width: scale(2) });
+        icon.circle(-cw / 2 + cr, 0, cr * 0.6);
+        icon.circle(cw / 2 - cr, 0, cr * 0.6);
+        icon.fill(color);
+      }
+
+      icon.position.set(tabWidth / 2, tabHeight / 2);
+      tab.addChild(icon);
 
       // Interactivity
       tab.eventMode = 'static';
