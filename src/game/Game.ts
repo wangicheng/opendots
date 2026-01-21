@@ -1279,7 +1279,7 @@ export class Game {
     this.menuContainer.addChild(this.levelSelectionUI);
   }
 
-  private showLevelSelection(): void {
+  private async showLevelSelection(): Promise<void> {
     this.gameState = GameState.MENU;
     // Clear editing session
     this.editingLevel = null;
@@ -1293,6 +1293,11 @@ export class Game {
 
     if (this.levelSelectionUI) {
       this.levelSelectionUI.setPen(this.currentPen.id);
+
+      // Refresh Levels
+      const levelService = MockLevelService.getInstance();
+      const levels = await levelService.getLevelList();
+      this.levelSelectionUI.updateLevels(levels);
     }
     this.clearLevel();
     this.gameContainer.visible = false;

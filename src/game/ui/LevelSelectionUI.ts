@@ -1006,4 +1006,12 @@ export class LevelSelectionUI extends PIXI.Container {
       // similar
     }
   }
+
+  /**
+   * Update the level list and refresh the display
+   */
+  public updateLevels(levels: LevelData[]): void {
+    this.levels = levels;
+    this.refreshVisibleLevels();
+  }
 }
