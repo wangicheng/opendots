@@ -77,17 +77,27 @@ export class MockLevelService {
       return level;
     });
 
-    // Add a specific "Draft" level for the current user to test the UI
-    const draftLevel: LevelData = {
-      ...this.builtinLevels[0],
-      id: 'draft_level_01',
-      author: 'Me',
-      authorId: CURRENT_USER_ID,
-      createdAt: Date.now(),
-      likes: 0,
-      isPublished: this.publishedLevelIds.has('draft_level_01') || false,
-      authorPassed: false
-    };
+    // Check if draft_level_01 exists in stored levels (so we persist changes to it)
+    const storedDraftIndex = storedLevels.findIndex(l => l.id === 'draft_level_01');
+    let draftLevel: LevelData;
+
+    if (storedDraftIndex >= 0) {
+      draftLevel = storedLevels[storedDraftIndex];
+      // Remove it from the stored list so we don't duplicate it when we append ...list (which includes storedLevels)
+      // Actually 'list' = rawList (builtin + stored) -> mapped.
+      // We need to be careful. 'list' contains mapped versions of storedLevels.
+    } else {
+      draftLevel = {
+        ...this.builtinLevels[0],
+        id: 'draft_level_01',
+        author: 'Me',
+        authorId: CURRENT_USER_ID,
+        createdAt: Date.now(),
+        likes: 0,
+        isPublished: this.publishedLevelIds.has('draft_level_01') || false,
+        authorPassed: false
+      };
+    }
 
     // Add multiple mock levels for the current user to test the 6-item layout
     const userLevels: LevelData[] = [];
@@ -105,8 +115,11 @@ export class MockLevelService {
       });
     }
 
+    // Filter out draft_level_01 from 'list' if it's there
+    const filteredList = list.filter(l => l.id !== 'draft_level_01');
+
     // Insert draftLevel and userLevels at the beginning
-    return [draftLevel, ...userLevels, ...list];
+    return [draftLevel, ...userLevels, ...filteredList];
   }
 
   /**

@@ -99,6 +99,7 @@ export class Game {
   private editorObjects: { container: PIXI.Container, data: any, type: string }[] = [];
   private selectedObject: { container: PIXI.Container, data: any, type: string } | null = null;
   private transformGizmo: TransformGizmo | null = null;
+  private initialAuthorPassed: boolean = false;
 
   // Collision handle mapping for ball detection
   private ballColliderHandles: Map<number, Ball> = new Map();
@@ -1060,10 +1061,10 @@ export class Game {
 
     // Update state locally if it's an author test play and they passed for first time
     const currentLevel = this.levelManager.getCurrentLevel();
-    if (currentLevel && currentLevel.authorId === CURRENT_USER_ID && !currentLevel.authorPassed) {
-      currentLevel.authorPassed = true;
-      this.editorHasChanged = true; // Mark as unsaved so they prompt on exit/save
-      console.log('Author passed the level locally! Status updated to Draft (unsaved).');
+    if (currentLevel && currentLevel.authorId === CURRENT_USER_ID) {
+      if (!currentLevel.authorPassed) {
+        currentLevel.authorPassed = true;
+      }
     }
 
     this.autoRestartTimeout = setTimeout(() => {
@@ -1287,13 +1288,18 @@ export class Game {
     const levels = await levelService.getLevelList();
 
     this.levelSelectionUI = new LevelSelectionUI(levels, (levelData) => {
+      // Create a deep clone of the level data to work on.
+      // This ensures that any in-memory modifications (status or content) during the session
+      // do not leak back to the UI source or Service cache if the user chooses to Discard.
+      const levelClone = JSON.parse(JSON.stringify(levelData));
+
       if (levelData.authorId === CURRENT_USER_ID && !levelData.isPublished) {
-        console.log('Entering Edit Mode for level:', levelData.id);
-        this.startLevel(levelData);
+        console.log('Entering Edit Mode for level:', levelClone.id);
+        this.startLevel(levelClone);
         // TODO: Switch to GameState.EDIT fully when EditorUI is ready
         // this.gameState = GameState.EDIT;
       } else {
-        this.startLevel(levelData);
+        this.startLevel(levelClone);
       }
     }, () => {
       this.createNewLevel();
@@ -1353,9 +1359,9 @@ export class Game {
       if (!this.editorUI) {
         // Initialize Editor UI if not exists
         this.editorUI = new EditorUI(
-          () => this.showLevelSelection(),
+          () => this.handleEditorClose(),
           (mode) => this.toggleEditorMode(mode),
-          (type) => this.addObject(type),
+          (type, subType, initialEventData) => this.addObject(type, subType, initialEventData),
           () => this.copySelectedObject(),
           () => this.deleteSelectedObject(),
           () => this.restartLevel(),
@@ -1368,6 +1374,10 @@ export class Game {
       this.editorUI.visible = true;
       this.editorUI.setUIState('play');
       this.editingLevel = levelData; // Track editing level so toggle works
+
+      // Initialize tracking for "Untested -> Draft" status update
+      this.initialAuthorPassed = levelData.authorPassed || false;
+
     } else {
       if (this.editorUI) {
         this.editorUI.visible = false;
@@ -1611,6 +1621,7 @@ export class Game {
     this.editingLevel = levelData;
     if (isNewSession) {
       this.editorHasChanged = false;
+      this.initialAuthorPassed = levelData.authorPassed || false;
     }
 
     // Clear everything
@@ -2212,27 +2223,35 @@ export class Game {
   }
 
   private handleEditorClose() {
-    if (!this.editorHasChanged) {
-      this.showLevelSelection();
-      return;
-    }
-    this.showConfirmDialog(
-      'Do you want to save your progress?',
-      async () => {
-        this.closeConfirmDialog();
-        await this.saveLevel();
+    if (this.editorHasChanged) {
+      this.showConfirmDialog(
+        'Do you want to save your progress?',
+        async () => {
+          this.closeConfirmDialog();
+          await this.saveLevel();
+          this.showLevelSelection();
+        },
+        () => {
+          this.closeConfirmDialog();
+          this.showLevelSelection();
+        },
+        {
+          confirmText: 'Save',
+          cancelText: 'Discard',
+          onDismiss: () => this.closeConfirmDialog()
+        }
+      );
+    } else {
+      // If content not modified, check if we need to auto-save status (Untested -> Draft)
+      if (this.editingLevel && this.editingLevel.authorPassed && !this.initialAuthorPassed) {
+        // Player passed the level without modifying it -> Auto Save status
+        this.saveLevel().then(() => {
+          this.showLevelSelection();
+        });
+      } else {
         this.showLevelSelection();
-      },
-      () => {
-        this.closeConfirmDialog();
-        this.showLevelSelection();
-      },
-      {
-        confirmText: 'Save',
-        cancelText: 'Discard',
-        onDismiss: () => this.closeConfirmDialog()
       }
-    );
+    }
   }
 
   public addObject(type: string, subType: string = 'rectangle', initialEventData?: any): void {
