@@ -48,6 +48,8 @@ export class EditorUI extends PIXI.Container {
     onPen: () => void
   ) {
     super();
+    // Set to passive so pointer events pass through to game container for drawing
+    this.eventMode = 'passive';
     this.onClose = onClose;
     this.onToggleMode = onToggleMode;
     this.onAddObject = onAddObject;

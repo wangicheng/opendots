@@ -57,7 +57,8 @@ export class DrawingManager {
     interactionArea.cursor = 'crosshair';
 
     interactionArea.on('pointerdown', this.onPointerDown.bind(this));
-    interactionArea.on('pointermove', this.onPointerMove.bind(this));
+    // Use globalpointermove so drawing continues even when pointer moves over UI elements
+    interactionArea.on('globalpointermove', this.onPointerMove.bind(this));
     interactionArea.on('pointerup', this.onPointerUp.bind(this));
     interactionArea.on('pointerupoutside', this.onPointerUp.bind(this));
   }
@@ -71,7 +72,7 @@ export class DrawingManager {
     interactionArea.cursor = 'default';
 
     interactionArea.removeAllListeners('pointerdown');
-    interactionArea.removeAllListeners('pointermove');
+    interactionArea.removeAllListeners('globalpointermove');
     interactionArea.removeAllListeners('pointerup');
     interactionArea.removeAllListeners('pointerupoutside');
 

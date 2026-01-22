@@ -170,6 +170,10 @@ export class Game {
     this.app.stage.addChild(this.menuContainer);
     this.app.stage.addChild(this.uiLayer);
 
+    // Set uiLayer to passive so pointer events pass through to gameContainer for drawing
+    // UI buttons use pointertap which still works with passive parent
+    this.uiLayer.eventMode = 'passive';
+
     // Create background grid
     this.createBackground();
 
@@ -738,7 +742,9 @@ export class Game {
     container.eventMode = 'static';
     container.cursor = 'pointer';
 
-    container.on('pointerup', () => {
+    // Use pointertap instead of pointerup to prevent accidental triggers
+    // when finishing a drawing stroke over the button
+    container.on('pointertap', () => {
       onClick();
     });
 
