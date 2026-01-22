@@ -479,6 +479,10 @@ export class Game {
       this.penBtnContainer.visible = true;
     }
 
+    if (this.editorUI) {
+      this.editorUI.setPenButtonVisible(true);
+    }
+
     if (this.publishBtnContainer) {
       // Logic managed by loadLevel/startLevel
     }
@@ -581,8 +585,24 @@ export class Game {
     this.drawingManager.enable(
       this.interactionArea,
       this.onLineDrawn.bind(this),
-      this.startGame.bind(this)
+      this.startGame.bind(this),
+      this.onDrawingStart.bind(this)
     );
+  }
+
+  /**
+   * Handle when drawing starts (pointer down)
+   */
+  private onDrawingStart(): void {
+    // Hide Pen Button immediately when player starts drawing
+    if (this.penBtnContainer) {
+      this.penBtnContainer.visible = false;
+    }
+
+    // Also hide Editor Pen Button if in use
+    if (this.editorUI) {
+      this.editorUI.setPenButtonVisible(false);
+    }
   }
 
   /**
@@ -611,6 +631,9 @@ export class Game {
       }
       if (this.publishBtnContainer) {
         this.publishBtnContainer.visible = false;
+      }
+      if (this.editorUI) {
+        this.editorUI.setPenButtonVisible(false);
       }
     }
   }

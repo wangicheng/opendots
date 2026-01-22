@@ -616,4 +616,10 @@ export class EditorUI extends PIXI.Container {
       }
     }
   }
+
+  public setPenButtonVisible(visible: boolean): void {
+    if (this.playPenBtn) {
+      this.playPenBtn.visible = visible;
+    }
+  }
 }

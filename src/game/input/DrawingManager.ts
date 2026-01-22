@@ -24,6 +24,7 @@ export class DrawingManager {
   private isValidStart = false;
   private onLineComplete: ((points: Point[]) => void) | null = null;
   private onDrawingEnd: (() => void) | null = null;
+  private onDrawingStart: (() => void) | null = null;
   private collisionProvider: CollisionProvider | null = null;
   private currentPen: Pen = DEFAULT_PEN;
 
@@ -46,9 +47,10 @@ export class DrawingManager {
   /**
    * Enable drawing on the specified container
    */
-  enable(interactionArea: PIXI.Container, callback: (points: Point[]) => void, onDrawingEnd?: () => void): void {
+  enable(interactionArea: PIXI.Container, callback: (points: Point[]) => void, onDrawingEnd?: () => void, onDrawingStart?: () => void): void {
     this.onLineComplete = callback;
     this.onDrawingEnd = onDrawingEnd || null;
+    this.onDrawingStart = onDrawingStart || null;
 
     // Ensure clean state
     this.disable(interactionArea);
@@ -134,6 +136,11 @@ export class DrawingManager {
 
     // Add first point
     this.currentPoints.push(startPoint);
+
+    // Notify start of drawing
+    if (this.onDrawingStart) {
+      this.onDrawingStart();
+    }
   }
 
   /**
