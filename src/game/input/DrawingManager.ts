@@ -265,6 +265,7 @@ export class DrawingManager {
         screenPoints,
         this.currentPen.color,
         this.currentPen.width * scaleFactor,
+        this.currentPen.opacity,
         null
       );
     }

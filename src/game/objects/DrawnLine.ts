@@ -66,6 +66,7 @@ export class DrawnLine {
       this.points,
       this.pen.color,
       this.pen.width,
+      this.pen.opacity,
       centroid
     );
   }

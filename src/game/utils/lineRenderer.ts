@@ -237,6 +237,7 @@ export function drawLineWithCornerStyle(
   points: Point[],
   color: number,
   width: number,
+  opacity: number = 1,
   centroid: Point | null = null
 ): void {
   if (points.length < 1) return;
@@ -250,7 +251,7 @@ export function drawLineWithCornerStyle(
   if (points.length === 1) {
     const p = points[0];
     graphics.circle(p.x - offsetX, p.y - offsetY, halfWidth);
-    graphics.fill(color);
+    graphics.fill({ color, alpha: opacity });
     return;
   }
 
@@ -280,7 +281,7 @@ export function drawLineWithCornerStyle(
     }
   }
 
-  graphics.fill(color);
+  graphics.fill({ color, alpha: opacity });
 }
 
 /**
