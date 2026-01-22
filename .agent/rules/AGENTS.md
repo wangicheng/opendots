@@ -1,75 +1,81 @@
+---
+trigger: always_on
+---
+
 # Project Overview
-Brain Dots is a web-based physics puzzle game where players draw lines to guide balls to a destination or make them meet. Built with **TypeScript**, **PixiJS** (rendering), and **Rapier2D** (physics), typically served via **Vite**.
+
+OpenDots is a physics-based puzzle game inspired by "Brain Dots," built using TypeScript, Vite, Pixi.js for rendering, and Rapier2d for physics simulation. Players solve levels by drawing lines and shapes to guide balls to their destinations or interact with various game objects. The project includes a fully functional level editor and a level selection interface.
 
 ## Repository Structure
-- `src/` - Source code root.
-  - `game/` - Core game logic.
-    - `Game.ts` - Main game controller and loop.
-    - `config.ts` - Game scaling and physics constants.
-    - `objects/` - Game entities (Ball, Line, Obstacle, etc.).
-    - `levels/` - Level definitions and loading logic.
-    - `ui/` - User interface layers (menus, HUD).
-    - `physics/` - Rapier2D integration and helpers.
-    - `input/` - Input handling (mouse/touch drawing).
-  - `main.ts` - Application entry point; bootstraps the Game.
-  - `style.css` - Global CSS reset and canvas sizing.
-- `public/` - Static assets (images, icons).
-- `docs/` - Documentation files.
+
+- `.agent/` - Agent workflows and configurations.
+- `src/` - Source code.
+  - `game/` - Core game logic and subsystems.
+    - `data/` - Data handling.
+    - `editor/` - Editor utilities (e.g., `TransformGizmo`).
+    - `effects/` - Visual effects managers.
+    - `input/` - Input handling logic.
+    - `levels/` - Level data schemas (`LevelSchema.ts`) and JSON files.
+    - `objects/` - Game entities (Ball, Obstacle, etc.) inheriting or implementing common interfaces.
+    - `physics/` - Physics engine integration (`PhysicsWorld`).
+    - `services/` - Data service layer (Mock vs Real APIs).
+    - `ui/` - User interface components (`LevelSelectionUI`, `EditorUI`).
+  - `main.ts` - Application entry point.
+- `public/` - Static assets.
+- `dist/` - Production build artifacts.
 
 ## Build & Development Commands
-Use `npm` (or `pnpm`/`yarn`) to run these commands from the root:
 
 ```bash
 # Install dependencies
 npm install
 
-# Start local development server (with --host)
+# Start development server (hot reload)
 npm run dev
 
-# Build for production (type-check + vite build)
+# Build for production
 npm run build
-
-# Preview production build locally
-npm run preview
 ```
 
 ## Code Style & Conventions
-- **TypeScript**: Strict mode enabled. Use explicit types.
-- **Naming**: PascalCase for classes/files (`Game.ts`), camelCase for methods/variables.
-- **Async/Await**: Preferred over raw promises for initialization strings.
-- **Imports**: verification of types via `import type` is encouraged where applicable.
-- **Formatting**: (Implicit) Follow existing brace styles and indentation (2 spaces).
+
+- **Language**: TypeScript (Strict mode enabled).
+- **Formatting**: Adhere to standard TypeScript conventions (PascalCase for classes, camelCase for methods/variables).
+- **Linting**: No explicit linter script, but code should be clean and strictly typed.
+- **Imports**: Use explicit imports.
+- **Components**: Game objects are typically classes encapsulating both Pixi visuals and Rapier physics bodies.
+
+## UI & Visual Guidelines
+
+> **Note**: Detailed UI specifications found in [.agent/rules/UI_DESIGN.md](.agent/rules/UI_DESIGN.md).
+
+- **Colors**:
+  - **Game Objects**: Balls (Blue/Pink), Static (Grey), Dynamic (Light Grey).
+  - **Special**: Ice (Cyan), Conveyor (Dark Grey), Selection (Material Blue).
+- **Typography**: `Arial` (Canvas), `Inter` (DOM).
+- **Core Layout**: 16:9 Canvas centered on `#242424` background.
 
 ## Architecture Notes
-The application follows a standard game loop architecture:
-1. **Entry**: `main.ts` dynamic-imports `Game.ts` and calls `init()`.
-2. **Core**: `Game` class initializes:
-   - **Pixi.Application**: For WebGL rendering.
-   - **PhysicsWorld** (Rapier): For simulation steps.
-3. **Loop**: A `ticker` updates the physics world, then synchronizes graphical objects (`Pixi.Container`) to their physical bodies.
-4. **Drawing**: User input creates static or dynamic bodies in the physics world, visualized by Pixi Graphics.
+
+- **Core Loop**: `Game.ts` manages the main game loop, orchestrating `PhysicsWorld` (Rapier) steps and `Pixi.Application` rendering updates.
+- **Physics**: Rapier2d is used for collision detection and rigid body dynamics. `PhysicsWorld` wrapper likely used.
+- **Rendering**: Pixi.js handles the 2D scenegraph. Visuals are often synchronized with physics bodies in the `update` loop.
+- **Level System**: Levels are defined in JSON (matching `LevelSchema.ts`). `LevelManager` handles loading/parsing.
+- **Editor**: `EditorUI.ts` (in `ui/`) and `TransformGizmo.ts` (in `editor/`) allow users to create and modify levels at runtime.
+- **Services**: `MockLevelService` provides a local storage-based backend for level progression and saving, designed to be swappable with a real API.
 
 ## Testing Strategy
-> TODO: Implement automated testing.
-- **Current**: Manual verification via `npm run dev`.
-- **Future**: Unit tests for physics logic (e.g., Vitest), E2E tests for game flow.
+
+- **Manual Testing**: Primary method. Run `npm run dev` and test gameplay mechanics, level editor interactions, and level transitions.
+- **Component Testing**: Isolate individual game objects (e.g., `Ball`, `Laser`) in specific test levels (like `level1.json` or a debug level) to verify physics and logic.
 
 ## Security & Compliance
-- **Dependencies**: Regular `npm audit`.
-- **Secrets**: No secrets should be committed. The app is client-side static.
-- **Input Sanitization**: Minimal concern as it's a client-side game, but level data processing should be robust.
+
+- **Dependencies**: Keep dependencies updated. Review `package.json` for security advisories.
+- **Secrets**: No secrets should be committed. API keys (if added) should be in `.env`.
 
 ## Agent Guardrails
-- **Performance**: Do not introduce heavy computations in the render loop (`ticker`).
-- **Physics**: Ensure Rapier bodies are properly disposed of when levels reset to prevent memory leaks.
-- **Files**:
-  - Avoid modifying `package-lock.json` unless adding dependencies.
-  - Keep `main.ts` minimal.
 
-## Extensibility Hooks
-- **New Levels**: Add new level configurations in `src/game/levels/` and register them in the level manager.
-- **New Objects**: Create classes in `src/game/objects/` extending the base game object structure.
-
-## Further Reading
-- [PixiJS Documentation](https://pixijs.com/)
-- [Rapier2D Documentation](https://rapier.rs/docs/user_guides/javascript/getting_started_js)
+- **Build Integrity**: Ensure `npm run build` passes before completing tasks involving code changes.
+- **Type Safety**: Do not suppress TypeScript errors with `@ts-ignore` unless absolutely necessary and well-justified.
+- **File Boundaries**: Avoid modifying `.gitignore` or `package-lock.json` unnecessarily.
