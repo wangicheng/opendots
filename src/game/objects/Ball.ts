@@ -63,6 +63,8 @@ export class Ball {
     const colliderDesc = R.ColliderDesc.ball(this.radius / SCALE)
       .setDensity(BALL_DENSITY)
       .setFriction(BALL_FRICTION)
+      // Use Multiply combine rule for friction when this ball collides with others
+      .setFrictionCombineRule(R.CoefficientCombineRule.Multiply)
       .setRestitution(BALL_RESTITUTION)
       .setCollisionGroups(collisionGroup)
       .setActiveEvents(R.ActiveEvents.COLLISION_EVENTS);

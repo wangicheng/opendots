@@ -101,7 +101,7 @@ export const BALL_COLORS = {
 
 // Ball physics
 export const BALL_DENSITY = 1.0;
-export const BALL_FRICTION = 0.01;
+export const BALL_FRICTION = 0;
 export const BALL_RESTITUTION = 0.0;
 
 // Obstacle settings (Static)
