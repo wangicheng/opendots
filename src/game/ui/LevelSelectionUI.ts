@@ -481,7 +481,7 @@ export class LevelSelectionUI extends PIXI.Container {
       });
 
       const padding = scale(10);
-      const iconSize = scale(16);
+      const iconSize = scale(14);
       const gap = scale(4);
       const totalWidth = padding + iconSize + gap + numText.width + padding;
       const pillHeight = scale(24);
