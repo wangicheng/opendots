@@ -6,7 +6,7 @@
 import * as PIXI from 'pixi.js';
 import { distanceSampling } from '../utils/douglasPeucker';
 import type { Point } from '../utils/douglasPeucker';
-import { getScaleFactor } from '../config';
+import { getScaleFactor, getCanvasWidth, getCanvasHeight } from '../config';
 import { drawLineWithCornerStyle } from '../utils/lineRenderer';
 import { type Pen, DEFAULT_PEN } from '../data/PenData';
 
@@ -106,10 +106,17 @@ export class DrawingManager {
     // Cancel any existing drawing first
     this.cancelDrawing();
 
+    // Clamp pointer to canvas bounds so drawing continues to the nearest edge
     const scaleFactor = getScaleFactor();
+    const canvasW = getCanvasWidth();
+    const canvasH = getCanvasHeight();
+
+    const clampedGlobalX = Math.min(Math.max(event.globalX, 0), canvasW);
+    const clampedGlobalY = Math.min(Math.max(event.globalY, 0), canvasH);
+
     const startPoint = {
-      x: event.globalX / scaleFactor,
-      y: event.globalY / scaleFactor
+      x: clampedGlobalX / scaleFactor,
+      y: clampedGlobalY / scaleFactor
     };
 
     // Check if starting point is valid
@@ -145,10 +152,19 @@ export class DrawingManager {
   private onPointerMove(event: PIXI.FederatedPointerEvent): void {
     if (!this.isDrawing || !this.currentGraphics) return;
 
+    // Clamp pointer to canvas bounds so when cursor leaves the window
+    // the drawing continues toward the nearest edge instead of using
+    // out-of-bounds coordinates.
     const scaleFactor = getScaleFactor();
+    const canvasW = getCanvasWidth();
+    const canvasH = getCanvasHeight();
+
+    const clampedGlobalX = Math.min(Math.max(event.globalX, 0), canvasW);
+    const clampedGlobalY = Math.min(Math.max(event.globalY, 0), canvasH);
+
     const point = {
-      x: event.globalX / scaleFactor,
-      y: event.globalY / scaleFactor
+      x: clampedGlobalX / scaleFactor,
+      y: clampedGlobalY / scaleFactor
     };
 
     // Only add point if it's far enough from the last point
