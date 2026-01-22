@@ -1627,8 +1627,8 @@ export class Game {
       isPublished: false,
       authorPassed: false,
       balls: {
-        blue: { x: 300, y: 500 },
-        pink: { x: 900, y: 500 }
+        blue: { x: 360, y: 250 },
+        pink: { x: 920, y: 250 }
       },
       obstacles: []
     };
@@ -2019,7 +2019,7 @@ export class Game {
                   const isCCW = normalize(angle2 - angle1) < normalize(angle3 - angle1);
                   g.arc(centerX, centerY, arcRadius, angle1, angle3, !isCCW);
                 } else {
-                  // Collinear
+                  // Collinear, treat as straight line (though unlikely for c-shape)
                   g.moveTo(p1.x, p1.y);
                   g.lineTo(p2.x, p2.y);
                   g.lineTo(p3.x, p3.y);
@@ -2051,7 +2051,15 @@ export class Game {
           g.roundRect(-d.width / 2, -d.height / 2, d.width, d.height, 5);
           break;
         case 'conveyor':
-          g.rect(-d.width / 2, -CONVEYOR_BELT_HEIGHT / 2, d.width, CONVEYOR_BELT_HEIGHT);
+          // Correct outlined shape (rectangle with rounded semi-circle ends)
+          const w = d.width;
+          const r = CONVEYOR_BELT_HEIGHT / 2;
+          g.moveTo(-w / 2, -r);
+          g.lineTo(w / 2, -r);
+          g.arc(w / 2, 0, r, -Math.PI / 2, Math.PI / 2);
+          g.lineTo(-w / 2, r);
+          g.arc(-w / 2, 0, r, Math.PI / 2, -Math.PI / 2);
+          g.closePath();
           break;
         case 'ice':
         case 'seesaw':
@@ -2076,7 +2084,7 @@ export class Game {
             const dx = d.x2 - d.x1;
             const dy = d.y2 - d.y1;
             const len = Math.sqrt(dx * dx + dy * dy);
-            const lh = 32; // Standard laser height
+            const lh = 20; // Standard laser height
             g.rect(-len / 2, -lh / 2, len, lh);
           }
           break;

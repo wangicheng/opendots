@@ -49,7 +49,7 @@ const CONSTRAINTS: Record<string, TransformConstraints> = {
 };
 
 // Visual constants
-const HANDLE_RADIUS = 8;
+const HANDLE_RADIUS = 5;
 const HANDLE_COLOR = 0x2196F3; // Blue
 const ROTATE_HANDLE_OFFSET = 40;
 const ROTATE_HANDLE_COLOR = 0x4CAF50; // Green
@@ -200,6 +200,9 @@ export class TransformGizmo extends PIXI.Container {
       this.createAndAddHandle('scale_b', HANDLE_COLOR);
     } else if (c.canScaleUniform) {
       // Uniform scaling (circle radius)
+      this.createAndAddHandle('scale_t', HANDLE_COLOR);
+      this.createAndAddHandle('scale_b', HANDLE_COLOR);
+      this.createAndAddHandle('scale_l', HANDLE_COLOR);
       this.createAndAddHandle('scale_r', HANDLE_COLOR);
     }
 
@@ -227,27 +230,27 @@ export class TransformGizmo extends PIXI.Container {
     const g = new PIXI.Graphics();
     const r = scale(HANDLE_RADIUS);
 
+    const strokeWidth = 2;
+    // Make visual slightly smaller than hit area (r) to feel more precise
+    const visualRadius = r - 1;
+
     if (type === 'rotate') {
-      // Rotate handle is a circle with a rotation icon hint
-      g.circle(0, 0, r);
+      // Rotate handle: Solid colored circle with white border
+      g.circle(0, 0, visualRadius);
+      // Use color (Green) for fill
       g.fill({ color });
-      g.moveTo(-r * 0.5, 0);
-      g.arc(0, 0, r * 0.5, Math.PI, 0, false);
-      g.stroke({ color: 0xFFFFFF, width: 1.5 });
-    } else if (type.startsWith('vertex')) {
-      // Diamond shape for vertices
-      g.poly([-r, 0, 0, -r, r, 0, 0, r]);
+      g.stroke({ width: strokeWidth, color: 0xFFFFFF });
+    } else if (type.startsWith('vertex') || type.startsWith('endpoint')) {
+      // Vertex/Endpoint: Solid colored circle with white border
+      g.circle(0, 0, visualRadius);
+      // Use color (Blue) for fill
       g.fill({ color });
-    } else if (type.startsWith('endpoint')) {
-      // Arrow shape for endpoints
-      g.circle(0, 0, r * 0.8);
-      g.fill({ color });
-      g.circle(0, 0, r * 0.4);
-      g.fill({ color: 0xFFFFFF });
+      g.stroke({ width: strokeWidth, color: 0xFFFFFF });
     } else {
-      // Square for scale handles
-      g.rect(-r, -r, r * 2, r * 2);
-      g.fill({ color });
+      // Scale handles: White circle with colored border
+      g.circle(0, 0, visualRadius);
+      g.fill({ color: 0xFFFFFF });
+      g.stroke({ width: strokeWidth, color: color });
     }
 
     g.eventMode = 'static';
@@ -293,7 +296,7 @@ export class TransformGizmo extends PIXI.Container {
       x2 = data.x2;
       y2 = data.y2;
       width = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
-      height = 32; // Standard laser height
+      height = 20; // Standard laser height
     } else if (type === 'ball_blue' || type === 'ball_pink') {
       radius = BALL_RADIUS;
       width = height = radius * 2;
@@ -392,6 +395,35 @@ export class TransformGizmo extends PIXI.Container {
 
         // Draw polygon and use it as the clickable area
         this.boundingBox.poly(poly);
+      } else if (data.type === 'c_shape' && data.points && data.points.length === 3) {
+        // C-shape: Draw arc
+        const p1 = points[0];
+        const p2 = points[1];
+        const p3 = points[2];
+        const x1 = p1.x, y1 = p1.y;
+        const x2 = p2.x, y2 = p2.y;
+        const x3 = p3.x, y3 = p3.y;
+
+        const D = 2 * (x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2));
+        if (Math.abs(D) > 0.001) {
+          const centerX = ((x1 * x1 + y1 * y1) * (y2 - y3) + (x2 * x2 + y2 * y2) * (y3 - y1) + (x3 * x3 + y3 * y3) * (y1 - y2)) / D;
+          const centerY = ((x1 * x1 + y1 * y1) * (x3 - x2) + (x2 * x2 + y2 * y2) * (x1 - x3) + (x3 * x3 + y3 * y3) * (x2 - x1)) / D;
+          const arcRadius = Math.sqrt(Math.pow(x1 - centerX, 2) + Math.pow(y1 - centerY, 2));
+          let angle1 = Math.atan2(y1 - centerY, x1 - centerX);
+          let angle2 = Math.atan2(y2 - centerY, x2 - centerX);
+          let angle3 = Math.atan2(y3 - centerY, x3 - centerX);
+          const normalize = (a: number) => (a + 2 * Math.PI) % (2 * Math.PI);
+          const isCCW = normalize(angle2 - angle1) < normalize(angle3 - angle1);
+
+          this.boundingBox.arc(centerX, centerY, arcRadius, angle1, angle3, !isCCW);
+        } else {
+          // Collinear fallback
+          const xs = points.map(p => p.x);
+          const ys = points.map(p => p.y);
+          const minX = Math.min(...xs), maxX = Math.max(...xs);
+          const minY = Math.min(...ys), maxY = Math.max(...ys);
+          this.boundingBox.rect(minX, minY, maxX - minX, maxY - minY);
+        }
       } else {
         // Fallback: draw rectangular hit area around points
         const xs = points.map(p => p.x);
@@ -400,6 +432,16 @@ export class TransformGizmo extends PIXI.Container {
         const minY = Math.min(...ys), maxY = Math.max(...ys);
         this.boundingBox.rect(minX, minY, maxX - minX, maxY - minY);
       }
+    } else if (type === 'conveyor') {
+      // Conveyor bounding (Pill shape)
+      const r = CONVEYOR_BELT_HEIGHT / 2;
+      const w = width; // width passed from logic above
+      this.boundingBox.moveTo(-w / 2, -r);
+      this.boundingBox.lineTo(w / 2, -r);
+      this.boundingBox.arc(w / 2, 0, r, -Math.PI / 2, Math.PI / 2);
+      this.boundingBox.lineTo(-w / 2, r);
+      this.boundingBox.arc(-w / 2, 0, r, Math.PI / 2, -Math.PI / 2);
+      this.boundingBox.closePath();
     } else {
       // Rectangle bounding
       this.boundingBox.rect(-hw, -hh, width, height);
@@ -620,7 +662,12 @@ export class TransformGizmo extends PIXI.Container {
 
     // Handle uniform scaling (circles)
     if (constraints.canScaleUniform && !constraints.canScaleWidth && !constraints.canScaleHeight) {
-      const delta = localDx * xDir;
+      let delta = 0;
+      if (handle === 'scale_l' || handle === 'scale_r') {
+        delta = localDx * xDir;
+      } else {
+        delta = localDy * yDir;
+      }
       const newRadius = Math.max(MIN_SIZE / 2, (initial.radius || 50) + delta);
       data.radius = newRadius;
       return;
@@ -642,10 +689,18 @@ export class TransformGizmo extends PIXI.Container {
     const localDx = dx * cos - dy * sin;
     const localDy = dx * sin + dy * cos;
 
-    // Update the moved vertex
+    // Calculate how much the object center has shifted due to re-centering
+    const shiftX = data.x - initial.x;
+    const shiftY = data.y - initial.y;
+
+    // Transform shift to local space
+    const shiftLocalX = shiftX * cos - shiftY * sin;
+    const shiftLocalY = shiftX * sin + shiftY * cos;
+
+    // Update the moved vertex (compensating for object center shift)
     data.points[vertexIndex] = {
-      x: initial.points[vertexIndex].x + localDx,
-      y: initial.points[vertexIndex].y + localDy
+      x: initial.points[vertexIndex].x + localDx - shiftLocalX,
+      y: initial.points[vertexIndex].y + localDy - shiftLocalY
     };
 
     // Recalculate centroid and recenter the object (for triangles)
