@@ -14,7 +14,7 @@ export interface BallConfig {
 }
 
 // Shape types
-export type ShapeType = 'rectangle' | 'square' | 'triangle' | 'circle' | 'c_shape';
+export type ShapeType = 'rectangle' | 'square' | 'triangle' | 'circle' | 'c_shape' | 'bezier';
 
 
 export interface ObstacleConfig {

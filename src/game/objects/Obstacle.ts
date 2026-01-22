@@ -199,6 +199,94 @@ export class Obstacle {
         break;
       }
 
+      case 'bezier': {
+        // Defined by 3 points: Start, Middle (on curve), End
+        if (points && points.length === 3 && thickness) {
+          const { cap = 'round' } = config;
+          const p0 = points[0];
+          const p1 = points[1]; // Point ON the curve (t=0.5)
+          const p2 = points[2];
+
+          // Calculate implicit control point 'cp'
+          // p1 = 0.25*p0 + 0.5*cp + 0.25*p2
+          // 0.5*cp = p1 - 0.25*p0 - 0.25*p2
+          // cp = 2*p1 - 0.5*p0 - 0.5*p2
+          const cpX = 2 * p1.x - 0.5 * p0.x - 0.5 * p2.x;
+          const cpY = 2 * p1.y - 0.5 * p0.y - 0.5 * p2.y;
+
+          // Physics approximation with segments
+          const segments = 10;
+          const step = 1 / segments;
+
+          let prevX = p0.x;
+          let prevY = p0.y;
+
+          for (let i = 1; i <= segments; i++) {
+            const t = i * step;
+            // Quadratic Bezier Formula: (1-t)^2 * P0 + 2(1-t)t * CP + t^2 * P2
+            const oneMinusT = 1 - t;
+            const t2 = t * t;
+
+            const currX = oneMinusT * oneMinusT * p0.x + 2 * oneMinusT * t * cpX + t2 * p2.x;
+            const currY = oneMinusT * oneMinusT * p0.y + 2 * oneMinusT * t * cpY + t2 * p2.y;
+
+            // Create segment collider
+            const dx = currX - prevX;
+            const dy = currY - prevY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const angle = Math.atan2(dy, dx);
+            const midX = (prevX + currX) / 2;
+            const midY = (prevY + currY) / 2;
+
+            const pCenter = physicsWorld.toPhysics(midX, midY);
+
+            const colliderDesc = R.ColliderDesc.cuboid(
+              (dist / 2) / SCALE,
+              (thickness / 2) / SCALE
+            )
+              .setTranslation(pCenter.x, pCenter.y)
+              .setRotation(-angle)
+              .setFriction(OBSTACLE_FRICTION)
+              .setRestitution(OBSTACLE_RESTITUTION)
+              .setDensity(OBSTACLE_DENSITY)
+              .setCollisionGroups(COLLISION_GROUP.OBSTACLE);
+
+            this.colliders.push(world.createCollider(colliderDesc, this.body));
+
+            prevX = currX;
+            prevY = currY;
+          }
+
+          // Add Round Caps if requested (Start and End only)
+          if (cap === 'round') {
+            const capRadius = thickness / 2;
+
+            // Start Cap
+            const startPos = physicsWorld.toPhysics(p0.x, p0.y);
+            const startCollider = R.ColliderDesc.ball(capRadius / SCALE)
+              .setTranslation(startPos.x, startPos.y)
+              .setFriction(OBSTACLE_FRICTION)
+              .setRestitution(OBSTACLE_RESTITUTION)
+              .setDensity(OBSTACLE_DENSITY)
+              .setCollisionGroups(COLLISION_GROUP.OBSTACLE);
+            this.colliders.push(world.createCollider(startCollider, this.body));
+
+            // End Cap
+            const endPos = physicsWorld.toPhysics(p2.x, p2.y);
+            const endCollider = R.ColliderDesc.ball(capRadius / SCALE)
+              .setTranslation(endPos.x, endPos.y)
+              .setFriction(OBSTACLE_FRICTION)
+              .setRestitution(OBSTACLE_RESTITUTION)
+              .setDensity(OBSTACLE_DENSITY)
+              .setCollisionGroups(COLLISION_GROUP.OBSTACLE);
+            this.colliders.push(world.createCollider(endCollider, this.body));
+          }
+
+          return;
+        }
+        break;
+      }
+
       case 'square':
       case 'rectangle':
       default: {
@@ -304,6 +392,27 @@ export class Obstacle {
           graphics.clear();
           // Draw relative to center (centerX, centerY are relative)
           graphics.arc(centerX, centerY, arcRadius, angle1, angle3, !isCCW);
+          graphics.stroke({ width: thickness, color: OBSTACLE_COLOR, cap: cap === 'round' ? 'round' : 'butt', join: 'round' });
+
+          return graphics;
+        }
+        break;
+      }
+
+      case 'bezier': {
+        // Defined by 3 points: Start, Middle (on curve), End
+        if (points && points.length === 3 && thickness) {
+          const { cap = 'round' } = config;
+          const p0 = points[0];
+          const p1 = points[1];
+          const p2 = points[2];
+
+          // Calculate implicit control point 'cp'
+          const cpX = 2 * p1.x - 0.5 * p0.x - 0.5 * p2.x;
+          const cpY = 2 * p1.y - 0.5 * p0.y - 0.5 * p2.y;
+
+          graphics.moveTo(p0.x, p0.y);
+          graphics.quadraticCurveTo(cpX, cpY, p2.x, p2.y);
           graphics.stroke({ width: thickness, color: OBSTACLE_COLOR, cap: cap === 'round' ? 'round' : 'butt', join: 'round' });
 
           return graphics;

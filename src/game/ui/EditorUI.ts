@@ -419,6 +419,7 @@ export class EditorUI extends PIXI.Container {
       items.push({ type: 'obstacle', subType: 'triangle' });
       items.push({ type: 'obstacle', subType: 'rectangle' });
       items.push({ type: 'obstacle', subType: 'c_shape' });
+      items.push({ type: 'obstacle', subType: 'bezier' });
     } else if (category === 'falling') {
       items.push({ type: 'falling', subType: 'circle' });
       items.push({ type: 'falling', subType: 'triangle' });
@@ -542,6 +543,11 @@ export class EditorUI extends PIXI.Container {
         // Solid C-shape representation: Arc open on right
         g.arc(0, 0, r * 0.8, Math.PI * 0.25, Math.PI * 1.75);
         g.stroke({ color: white, width: r * 0.4, cap: 'round' });
+      } else if (subType === 'bezier') {
+        // Curve representation S-like or simple curve
+        g.moveTo(-r * 0.8, r * 0.5);
+        g.quadraticCurveTo(0, -r * 1.2, r * 0.8, r * 0.5);
+        g.stroke({ color: white, width: r * 0.3, cap: 'round' });
       }
     } else if (type === 'falling') {
       // Hollow representation

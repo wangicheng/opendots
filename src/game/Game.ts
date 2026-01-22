@@ -2305,6 +2305,15 @@ export class Game {
           points: [{ x: 50, y: -50 }, { x: 50, y: 50 }, { x: -50, y: 0 }],
           thickness: 20
         };
+      } else if (subType === 'bezier') {
+        newObj = {
+          type: 'bezier',
+          x: designX,
+          y: designY,
+          angle: 0,
+          points: [{ x: -60, y: 20 }, { x: 0, y: -40 }, { x: 60, y: 20 }], // Start, Middle (on-curve), End
+          thickness: 20
+        };
       } else {
         // Default to rectangle
         newObj = { type: 'rectangle', width: 100, height: 100, x: designX, y: designY, angle: 0 };

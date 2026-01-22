@@ -37,6 +37,7 @@ const CONSTRAINTS: Record<string, TransformConstraints> = {
   'obstacle_rectangle': { canMove: true, canRotate: true, canScaleWidth: true, canScaleHeight: true, canScaleUniform: false, canEditVertices: false, canEditEndpoints: false },
   'obstacle_triangle': { canMove: true, canRotate: true, canScaleWidth: false, canScaleHeight: false, canScaleUniform: false, canEditVertices: true, canEditEndpoints: false, vertexCount: 3 },
   'obstacle_c_shape': { canMove: true, canRotate: false, canScaleWidth: false, canScaleHeight: false, canScaleUniform: false, canEditVertices: true, canEditEndpoints: false, vertexCount: 3 },
+  'obstacle_bezier': { canMove: true, canRotate: false, canScaleWidth: false, canScaleHeight: false, canScaleUniform: false, canEditVertices: true, canEditEndpoints: false, vertexCount: 3 },
   'falling_circle': { canMove: true, canRotate: false, canScaleWidth: false, canScaleHeight: false, canScaleUniform: true, canEditVertices: false, canEditEndpoints: false },
   'falling_rectangle': { canMove: true, canRotate: true, canScaleWidth: true, canScaleHeight: true, canScaleUniform: false, canEditVertices: false, canEditEndpoints: false },
   'falling_triangle': { canMove: true, canRotate: true, canScaleWidth: false, canScaleHeight: false, canScaleUniform: false, canEditVertices: true, canEditEndpoints: false, vertexCount: 3 },
@@ -305,7 +306,7 @@ export class TransformGizmo extends PIXI.Container {
     } else if (data.type === 'circle') {
       radius = data.radius || data.width / 2 || 50;
       width = height = radius * 2;
-    } else if (data.type === 'triangle' || data.type === 'c_shape') {
+    } else if (data.type === 'triangle' || data.type === 'c_shape' || data.type === 'bezier') {
       points = data.points;
       if (points && points.length >= 3) {
         // Calculate bounding box of points
@@ -347,8 +348,8 @@ export class TransformGizmo extends PIXI.Container {
       // Polygon bounding
       const flatPoints = points.flatMap(p => [p.x, p.y]);
       this.boundingBox.poly(flatPoints);
-    } else if (points && data.type === 'c_shape') {
-      // C-shape - draw a rectangle around the points for hit area
+    } else if (points && (data.type === 'c_shape' || data.type === 'bezier')) {
+      // C-shape/Bezier - draw a rectangle around the points for hit area
       const xs = points.map(p => p.x);
       const ys = points.map(p => p.y);
       const minX = Math.min(...xs), maxX = Math.max(...xs);
