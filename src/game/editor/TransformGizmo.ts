@@ -349,12 +349,57 @@ export class TransformGizmo extends PIXI.Container {
       const flatPoints = points.flatMap(p => [p.x, p.y]);
       this.boundingBox.poly(flatPoints);
     } else if (points && (data.type === 'c_shape' || data.type === 'bezier')) {
-      // C-shape/Bezier - draw a rectangle around the points for hit area
-      const xs = points.map(p => p.x);
-      const ys = points.map(p => p.y);
-      const minX = Math.min(...xs), maxX = Math.max(...xs);
-      const minY = Math.min(...ys), maxY = Math.max(...ys);
-      this.boundingBox.rect(minX, minY, maxX - minX, maxY - minY);
+      // C-shape/Bezier - prefer shape-accurate hit area for Bezier, keep rect for C-shape
+      if (data.type === 'bezier' && data.thickness) {
+        // Approximate the stroked bezier as a polygon by sampling the curve
+        const p0 = points[0];
+        const p1 = points[1];
+        const p2 = points[2];
+        const cpX = 2 * p1.x - 0.5 * p0.x - 0.5 * p2.x;
+        const cpY = 2 * p1.y - 0.5 * p0.y - 0.5 * p2.y;
+
+        const thickness = data.thickness || 20;
+        const half = thickness / 2;
+        const segments = 20;
+
+        // Use arrays of point pairs so reversing keeps x/y together
+        const leftPts: { x: number; y: number }[] = [];
+        const rightPts: { x: number; y: number }[] = [];
+
+        for (let i = 0; i <= segments; i++) {
+          const t = i / segments;
+          const omt = 1 - t;
+          const x = omt * omt * p0.x + 2 * omt * t * cpX + t * t * p2.x;
+          const y = omt * omt * p0.y + 2 * omt * t * cpY + t * t * p2.y;
+
+          // derivative for tangent
+          const dx = 2 * omt * (cpX - p0.x) + 2 * t * (p2.x - cpX);
+          const dy = 2 * omt * (cpY - p0.y) + 2 * t * (p2.y - cpY);
+          const len = Math.sqrt(dx * dx + dy * dy) || 1;
+          const nx = -dy / len;
+          const ny = dx / len;
+
+          leftPts.push({ x: x + nx * half, y: y + ny * half });
+          rightPts.push({ x: x - nx * half, y: y - ny * half });
+        }
+
+        // Build flat coordinate array: left side forward, right side reversed
+        const poly: number[] = [];
+        for (const p of leftPts) poly.push(p.x, p.y);
+        for (let i = rightPts.length - 1; i >= 0; i--) {
+          poly.push(rightPts[i].x, rightPts[i].y);
+        }
+
+        // Draw polygon and use it as the clickable area
+        this.boundingBox.poly(poly);
+      } else {
+        // Fallback: draw rectangular hit area around points
+        const xs = points.map(p => p.x);
+        const ys = points.map(p => p.y);
+        const minX = Math.min(...xs), maxX = Math.max(...xs);
+        const minY = Math.min(...ys), maxY = Math.max(...ys);
+        this.boundingBox.rect(minX, minY, maxX - minX, maxY - minY);
+      }
     } else {
       // Rectangle bounding
       this.boundingBox.rect(-hw, -hh, width, height);

@@ -2002,6 +2002,21 @@ export class Game {
                   g.lineTo(p3.x, p3.y);
                 }
               }
+            } else if (subType === 'bezier') {
+              // Draw shape-accurate bezier outline for selection highlight
+              if (d.points && d.points.length === 3 && d.thickness) {
+                const p0 = d.points[0];
+                const p1 = d.points[1];
+                const p2 = d.points[2];
+                const cpX = 2 * p1.x - 0.5 * p0.x - 0.5 * p2.x;
+                const cpY = 2 * p1.y - 0.5 * p0.y - 0.5 * p2.y;
+
+                // Stroke the bezier as the selection path
+                g.moveTo(p0.x, p0.y);
+                g.quadraticCurveTo(cpX, cpY, p2.x, p2.y);
+
+                // For thicker selection (rounded caps), use stroke options below when applying stroke
+              }
             } else {
               const w = d.width || 100;
               const h = d.height || 100;
@@ -2050,6 +2065,16 @@ export class Game {
     if (type === 'obstacle' && data.type === 'c_shape') {
       outline.stroke({
         width: data.thickness + thickness,
+        color: color,
+        alpha: EDITOR_SELECTION_ALPHA,
+        cap: 'round',
+        join: 'round'
+      });
+    } else if (type === 'obstacle' && data.type === 'bezier') {
+      // For bezier, stroke using thickness + selection thickness and rounded caps
+      const strokeWidth = (data.thickness || 20) + thickness;
+      outline.stroke({
+        width: strokeWidth,
         color: color,
         alpha: EDITOR_SELECTION_ALPHA,
         cap: 'round',
