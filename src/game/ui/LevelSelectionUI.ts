@@ -493,9 +493,9 @@ export class LevelSelectionUI extends PIXI.Container {
       bg.fill({ color: 0x000000, alpha: 0.4 });
       likesContainer.addChild(bg);
 
-      // Heart Icon
-      const heartText = new PIXI.Text({
-        text: '\uF406', // Heart Fill
+      // Likes Icon (Thumb Up)
+      const thumbIcon = new PIXI.Text({
+        text: '\uF406', // hand-thumbs-up-fill
         style: {
           fontFamily: 'bootstrap-icons',
           fontSize: iconSize,
@@ -503,9 +503,9 @@ export class LevelSelectionUI extends PIXI.Container {
           padding: scale(4)
         }
       });
-      heartText.anchor.set(0.5);
-      heartText.position.set(padding + iconSize / 2, pillHeight / 2);
-      likesContainer.addChild(heartText);
+      thumbIcon.anchor.set(0.5);
+      thumbIcon.position.set(padding + iconSize / 2, pillHeight / 2);
+      likesContainer.addChild(thumbIcon);
 
       // Likes Number
       numText.anchor.set(0, 0.5); // Left align
