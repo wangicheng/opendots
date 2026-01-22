@@ -74,6 +74,7 @@ export class TransformGizmo extends PIXI.Container {
   private initialData: any = null;
   private initialContainerPos: { x: number, y: number } = { x: 0, y: 0 };
   private initialContainerRotation: number = 0;
+  private initialMouseAngle: number = 0;
 
   // Callbacks
   private onTransformChange: (() => void) | null = null;
@@ -528,8 +529,14 @@ export class TransformGizmo extends PIXI.Container {
     };
     this.initialContainerRotation = this.targetContainer.rotation;
 
-    // Attach global listeners
+    // Limit global listener to window
     const doc = window;
+
+    if (handleType === 'rotate') {
+      const globalPos = this.targetContainer.getGlobalPosition();
+      this.initialMouseAngle = Math.atan2(e.nativeEvent.clientY - globalPos.y, e.nativeEvent.clientX - globalPos.x);
+    }
+
     doc.addEventListener('pointermove', this.onPointerMove);
     doc.addEventListener('pointerup', this.onPointerUp);
     doc.addEventListener('pointercancel', this.onPointerUp);
@@ -612,11 +619,14 @@ export class TransformGizmo extends PIXI.Container {
     // Get center in global space
     const globalPos = this.targetContainer.getGlobalPosition();
 
-    // Calculate angle from center to mouse
-    const angle = Math.atan2(clientY - globalPos.y, clientX - globalPos.x);
+    // Calculate current angle from center to mouse
+    const currentMouseAngle = Math.atan2(clientY - globalPos.y, clientX - globalPos.x);
 
-    // Add 90 degrees because rotate handle is at top (negative Y)
-    const rotationRad = angle + Math.PI / 2;
+    // Calculate delta from initial mouse angle
+    const deltaAngle = currentMouseAngle - this.initialMouseAngle;
+
+    // Apply delta to initial rotation
+    const rotationRad = this.initialContainerRotation + deltaAngle;
 
     // Apply to data (in degrees)
     const rotationDeg = (rotationRad * 180) / Math.PI;

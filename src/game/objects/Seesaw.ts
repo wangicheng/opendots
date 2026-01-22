@@ -35,6 +35,7 @@ export class Seesaw {
     this.graphics = Seesaw.createVisual(config);
     // Force container to 0,0 locally because we update children to absolute world coordinates
     this.graphics.position.set(0, 0);
+    this.graphics.rotation = 0;
 
     // Retrieve references so we can update them
     this.plankGraphics = this.graphics.children[0] as PIXI.Graphics;
@@ -172,8 +173,10 @@ export class Seesaw {
 
     // Set initial position for plank
     plankGraphics.position.set(0, 0);
-    // Set initial rotation for preview
-    plankGraphics.rotation = (angle * Math.PI) / 180;
+
+    // Set initial rotation for the container instead of the plank
+    // This fixes the editor issue where the container is rotated by Gizmo, causing double rotation if plank is also rotated
+    graphics.rotation = (angle * Math.PI) / 180;
 
     // Create Pivot (Axis) Graphics
     const pivotGraphics = new PIXI.Graphics();
