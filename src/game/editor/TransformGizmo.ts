@@ -79,6 +79,11 @@ export class TransformGizmo extends PIXI.Container {
   // Callbacks
   private onTransformChange: (() => void) | null = null;
   private onTransformEnd: (() => void) | null = null;
+  private onContentClick: (() => void) | null = null;
+
+  // Interaction State
+  private hasMoved: boolean = false;
+  private isExternalStart: boolean = false;
 
   constructor() {
     super();
@@ -107,7 +112,8 @@ export class TransformGizmo extends PIXI.Container {
     data: any,
     type: string,
     onTransformChange?: () => void,
-    onTransformEnd?: () => void
+    onTransformEnd?: () => void,
+    onContentClick?: () => void
   ): void {
     this.clearHandles();
 
@@ -116,6 +122,7 @@ export class TransformGizmo extends PIXI.Container {
     this.targetType = type;
     this.onTransformChange = onTransformChange || null;
     this.onTransformEnd = onTransformEnd || null;
+    this.onContentClick = onContentClick || null;
 
     const constraintKey = this.getConstraintKey(type, data);
     this.constraints = CONSTRAINTS[constraintKey] || {
@@ -520,6 +527,8 @@ export class TransformGizmo extends PIXI.Container {
     this.activeHandle = handleType;
     // Use nativeEvent coordinates to match onPointerMove which uses native PointerEvent
     this.dragStartGlobal = { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY };
+    this.hasMoved = false;
+    this.isExternalStart = false;
 
     // Deep clone initial data
     this.initialData = JSON.parse(JSON.stringify(this.targetData));
@@ -544,6 +553,14 @@ export class TransformGizmo extends PIXI.Container {
 
   private onPointerMove = (e: PointerEvent): void => {
     if (!this.isDragging || !this.activeHandle || !this.targetData || !this.targetContainer) return;
+
+    // Check for movement threshold
+    if (!this.hasMoved) {
+      const dist = Math.hypot(e.clientX - this.dragStartGlobal.x, e.clientY - this.dragStartGlobal.y);
+      if (dist > 5) {
+        this.hasMoved = true;
+      }
+    }
 
     const scaleFactor = getScaleFactor();
     const dx = (e.clientX - this.dragStartGlobal.x) / scaleFactor;
@@ -581,6 +598,10 @@ export class TransformGizmo extends PIXI.Container {
 
   private onPointerUp = (): void => {
     this.isDragging = false;
+    if (!this.hasMoved && this.activeHandle === 'move' && !this.isExternalStart) {
+      this.onContentClick?.();
+    }
+
     this.activeHandle = null;
     window.removeEventListener('pointermove', this.onPointerMove);
     window.removeEventListener('pointerup', this.onPointerUp);
@@ -787,6 +808,8 @@ export class TransformGizmo extends PIXI.Container {
     this.activeHandle = 'move';
     // Use nativeEvent coordinates to match onPointerMove which uses native PointerEvent
     this.dragStartGlobal = { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY };
+    this.hasMoved = false;
+    this.isExternalStart = true;
 
     // Deep clone initial data
     this.initialData = JSON.parse(JSON.stringify(this.targetData));

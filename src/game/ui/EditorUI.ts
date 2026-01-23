@@ -135,6 +135,9 @@ export class EditorUI extends PIXI.Container {
 
     // Restore UI State (Visibility)
     this.setUIState(this.currentMode);
+
+    // Apply tools state again to ensure bottom bar visibility is correct after recreation
+    this.updateTools(this.lastHasSelection, this.lastIsBall);
   }
 
   private createToggle(x: number, y: number): void {
@@ -293,6 +296,12 @@ export class EditorUI extends PIXI.Container {
 
     this.deleteBtn.alpha = alpha;
     this.deleteBtn.eventMode = mode;
+
+    // Toggle Bottom Bar visibility based on selection
+    const showBottomBar = !hasSelection;
+    if (this.bottomBar) this.bottomBar.visible = showBottomBar;
+    if (this.tabsContainer) this.tabsContainer.visible = showBottomBar;
+    if (this.itemsContainer) this.itemsContainer.visible = showBottomBar;
   }
 
 

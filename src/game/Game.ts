@@ -432,6 +432,7 @@ export class Game {
 
     // Update DrawingManager with collision provider
     if (this.drawingManager) {
+      this.interactionArea.removeAllListeners();
       this.drawingManager.enable(
         this.interactionArea,
         this.onLineDrawn.bind(this),
@@ -1631,10 +1632,55 @@ export class Game {
       this.drawingManager.disable(this.interactionArea);
     }
 
-    // Enable background deselection in editor mode
+    // Enable background interaction in editor mode
+    // Click: Deselect
+    // Drag: Move currently selected object
     this.interactionArea.eventMode = 'static';
-    this.interactionArea.on('pointerdown', () => {
-      this.deselectObject();
+    this.interactionArea.removeAllListeners();
+    this.interactionArea.on('pointerdown', (e: PIXI.FederatedPointerEvent) => {
+      // If no object selected, just ensure clean state
+      if (!this.selectedObject) {
+        this.deselectObject();
+        return;
+      }
+
+      const startX = e.global.x;
+      const startY = e.global.y;
+      let hasMoved = false;
+
+      const onMove = (moveEvent: PIXI.FederatedPointerEvent) => {
+        const dx = moveEvent.global.x - startX;
+        const dy = moveEvent.global.y - startY;
+
+        // Threshold to distinguish click from drag
+        if (Math.hypot(dx, dy) > scale(10)) {
+          hasMoved = true;
+
+          if (this.transformGizmo) {
+            // Handover control to gizmo using the original event to preserve start point
+            this.transformGizmo.startMoveFromExternal(e);
+          }
+
+          cleanup();
+        }
+      };
+
+      const onUp = () => {
+        cleanup();
+        if (!hasMoved) {
+          this.deselectObject();
+        }
+      };
+
+      const cleanup = () => {
+        this.interactionArea.off('globalpointermove', onMove);
+        this.interactionArea.off('pointerup', onUp);
+        this.interactionArea.off('pointerupoutside', onUp);
+      };
+
+      this.interactionArea.on('globalpointermove', onMove);
+      this.interactionArea.on('pointerup', onUp);
+      this.interactionArea.on('pointerupoutside', onUp);
     });
 
     // Hide Play UI
@@ -1797,7 +1843,8 @@ export class Game {
         data,
         type,
         () => this.onGizmoTransformChange(),
-        () => this.onGizmoTransformEnd()
+        () => this.onGizmoTransformEnd(),
+        () => this.deselectObject()
       );
     }
 
