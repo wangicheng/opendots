@@ -24,7 +24,7 @@ This document serves as the single source of truth for the visual style and UI c
 ### Cards (Level Selection)
 - **Container**:
   - Background: White (`0xFFFFFF`).
-  - Shape: Rounded corners.
+  - Shape: Sharp corners.
   - Shadow: Soft blur (`Blur: 8`, `Alpha: 0.3`, `Y-offset: 4`).
 - **Status Pills** (Top Left):
   - *Untested*: Light Grey background (`#EEEEEE`), Grey text.
