@@ -122,18 +122,18 @@ export class LevelSelectionUI extends PIXI.Container {
 
     // 2.5 Sorting / Filtering UI (Center-Right)
     const sortY = (headerHeight + scale(10)) / 2;
-    const sortX = canvasWidth / 2 - scale(140);
 
+    // Create buttons first to measure them
     // "Latest" Button
-    this.latestBtnText = this.createSortButton(t('sort.latest'), sortX, sortY, 'latest');
+    this.latestBtnText = this.createSortButton(t('sort.latest'), 0, sortY, 'latest');
     this.headerContainer.addChild(this.latestBtnText);
 
     // "Popular" Button
-    this.popularBtnText = this.createSortButton(t('sort.popular'), sortX + scale(100), sortY, 'popular');
+    this.popularBtnText = this.createSortButton(t('sort.popular'), 0, sortY, 'popular');
     this.headerContainer.addChild(this.popularBtnText);
 
     // "Mine" Button
-    this.mineBtnText = this.createHeaderInteractiveText(t('sort.mine'), sortX + scale(220), sortY, () => {
+    this.mineBtnText = this.createHeaderInteractiveText(t('sort.mine'), 0, sortY, () => {
       if (this.filterAuthorId === CURRENT_USER_ID) {
         this.setFilterAuthor(null);
       } else {
@@ -141,6 +141,15 @@ export class LevelSelectionUI extends PIXI.Container {
       }
     });
     this.headerContainer.addChild(this.mineBtnText);
+
+    // Dynamic Layout Calculation
+    const gap = scale(40);
+    const totalWidth = this.latestBtnText.width + gap + this.popularBtnText.width + gap + this.mineBtnText.width;
+    const startX = (canvasWidth - totalWidth) / 2;
+
+    this.latestBtnText.x = startX;
+    this.popularBtnText.x = startX + this.latestBtnText.width + gap;
+    this.mineBtnText.x = startX + this.latestBtnText.width + gap + this.popularBtnText.width + gap;
 
     // Filter Tag Component (Initially hidden/empty)
     this.filterFilterTagContainer = new PIXI.Container();
@@ -422,12 +431,10 @@ export class LevelSelectionUI extends PIXI.Container {
         textColor = '#888888'; // Gray text
       }
 
-      const tagW = scale(80);
+
       const tagH = scale(24);
       const tagRadius = scale(12);
-
-      tagBg.roundRect(0, 0, tagW, tagH, tagRadius);
-      tagBg.fill(labelColor);
+      const tagPadding = scale(20);
 
       const tagText = new PIXI.Text({
         text: labelText,
@@ -438,6 +445,12 @@ export class LevelSelectionUI extends PIXI.Container {
           fontWeight: 'bold'
         }
       });
+      // Measure dynamic width
+      const tagW = Math.max(scale(60), tagText.width + tagPadding);
+
+      tagBg.roundRect(0, 0, tagW, tagH, tagRadius);
+      tagBg.fill(labelColor);
+
       tagText.anchor.set(0.5);
       tagText.position.set(tagW / 2, tagH / 2); // Center of bg
 
@@ -495,7 +508,6 @@ export class LevelSelectionUI extends PIXI.Container {
       numText.position.set(padding + iconSize + gap, pillHeight / 2);
       likesContainer.addChild(numText);
 
-      likesContainer.position.set(scale(12), scale(12));
       likesContainer.position.set(scale(12), scale(12));
       container.addChild(likesContainer);
     }
@@ -999,13 +1011,14 @@ export class LevelSelectionUI extends PIXI.Container {
     const canvasWidth = getCanvasWidth();
     const headerHeight = getCanvasHeight() * this.HEADER_HEIGHT_RATIO;
     const sortY = (headerHeight + scale(10)) / 2;
-    // recalculating sortX same as setupHeader
-    const sortX = canvasWidth / 2 - scale(140);
-    const mineBtnX = sortX + scale(220);
-    // Mine button text width is small.
-
-    // Let's place it at mineBtnX + scale(80) 
-    this.filterFilterTagContainer.x = mineBtnX + scale(80);
+    // Let's place it at mineBtnX + mineBtnWidth + spacing
+    if (this.mineBtnText) {
+      this.filterFilterTagContainer.x = this.mineBtnText.x + this.mineBtnText.width + scale(30);
+    } else {
+      // Fallback
+      const sortX = canvasWidth / 2;
+      this.filterFilterTagContainer.x = sortX + scale(200);
+    }
     this.filterFilterTagContainer.y = sortY - tagHeight / 2;
 
     // --- Interaction ---

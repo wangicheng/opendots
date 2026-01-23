@@ -65,18 +65,19 @@ export class UserProfileCard extends PIXI.Container {
 
     // --- Layout Calculations ---
     const cardWidth = scale(800);
-    const padding = scale(30);
+    const padding = scale(40);
 
-    // Preview determines the height (Master)
-    // Width ~ 60% of card minus padding
-    const previewWidth = (cardWidth * 0.6) - padding;
-    const previewHeight = previewWidth * (9 / 16); // Fixed 16:9 ratio
+    // Left (Level Content) 60%, Right (Author) 40%
+    const gap = scale(20);
+    const availableWidth = cardWidth - (padding * 2) - gap;
+    const finalLeftWidth = availableWidth * 0.6;
+    const finalRightWidth = availableWidth * 0.4;
 
-    // Stats area height (reduced for single line)
-    const statsHeight = scale(40);
+    const previewWidth = finalLeftWidth;
+    const previewHeight = previewWidth * (9 / 16);
 
-    // Card Height is Preview Height + Stats Height + Padding * 2
-    const cardHeight = previewHeight + statsHeight + (padding * 2);
+    const statsAreaHeight = scale(80);
+    const cardHeight = previewHeight + statsAreaHeight + (padding * 2);
 
     // 2. Card Container
     const card = new PIXI.Container();
@@ -100,11 +101,14 @@ export class UserProfileCard extends PIXI.Container {
     card.eventMode = 'static';
     card.on('pointertap', (e) => e.stopPropagation());
 
-    // 3. Level Preview (Left Side)
-    const previewContainer = new PIXI.Container();
-    previewContainer.position.set(padding, padding);
+    // --- LEFT COLUMN ---
+    const leftCol = new PIXI.Container();
+    leftCol.position.set(padding, padding);
+    card.addChild(leftCol);
 
-    // Preview Shadow
+    // 1. Preview
+    const previewContainer = new PIXI.Container();
+
     const previewShadow = new PIXI.Graphics();
     previewShadow.rect(0, 0, previewWidth, previewHeight);
     previewShadow.fill({ color: 0x000000, alpha: 0.3 });
@@ -112,108 +116,114 @@ export class UserProfileCard extends PIXI.Container {
     previewShadow.position.set(0, scale(4));
     previewContainer.addChild(previewShadow);
 
-    // Preview Background
     const previewBg = new PIXI.Graphics();
     previewBg.rect(0, 0, previewWidth, previewHeight);
     previewBg.fill(0xF5F5F5);
     previewBg.stroke({ width: 1, color: 0xEEEEEE });
     previewContainer.addChild(previewBg);
 
-    // Mask for content
     const previewMask = new PIXI.Graphics();
     previewMask.rect(0, 0, previewWidth, previewHeight);
     previewMask.fill(0xFFFFFF);
     previewContainer.addChild(previewMask);
 
-    // Render Level Content using callback
     const levelContent = this.getThumbnail(previewWidth, previewHeight);
     levelContent.mask = previewMask;
     previewContainer.addChild(levelContent);
 
-    card.addChild(previewContainer);
+    leftCol.addChild(previewContainer);
 
-    // 3.5 Level Stats (Below Preview)
-    const statsContainer = new PIXI.Container();
-    statsContainer.position.set(padding, padding + previewHeight + scale(15));
-    card.addChild(statsContainer);
+    // 2. Info Area (Stats + Like)
+    const infoContainer = new PIXI.Container();
+    infoContainer.position.set(0, previewHeight + scale(15));
+    leftCol.addChild(infoContainer);
 
-    const dateStr = this.levelData.createdAt
-      ? new Date(this.levelData.createdAt).toLocaleDateString()
-      : '-';
+    // 2a. Text Stats (Vertical List)
+    const textStats = new PIXI.Container();
+    infoContainer.addChild(textStats);
+
+    const t = (key: string) => LanguageManager.getInstance().t(key);
+    const statLabelStyle = new PIXI.TextStyle({
+      fontFamily: 'Arial', fontSize: scale(14), fill: '#888888'
+    });
+    const statValueStyle = new PIXI.TextStyle({
+      fontFamily: 'Arial', fontSize: scale(14), fontWeight: 'bold', fill: '#555555'
+    });
+
+    const createStatRow = (label: string, value: string, yPos: number) => {
+      const row = new PIXI.Container();
+      const l = new PIXI.Text({ text: label, style: statLabelStyle });
+      const v = new PIXI.Text({ text: value, style: statValueStyle });
+      v.x = l.width + scale(5);
+      row.addChild(l, v);
+      row.y = yPos;
+      return row;
+    };
+
+    const dateStr = this.levelData.isPublished
+      ? new Date(this.levelData.createdAt || Date.now()).toLocaleDateString()
+      : (this.levelData.createdAt ? new Date(this.levelData.createdAt).toLocaleDateString() : '-');
+    const labelText = this.levelData.isPublished ? t('level.published') : t('level.created');
+
+    textStats.addChild(createStatRow(labelText, dateStr, 0));
 
     const attempts = this.levelData.attempts ?? 0;
+    textStats.addChild(createStatRow(t('level.attempts'), attempts.toString(), scale(25)));
+
     const clears = this.levelData.clears ?? 0;
-
-    const statLabelStyle = new PIXI.TextStyle({
-      fontFamily: 'Arial',
-      fontSize: scale(16),
-      fill: '#888888',
-    });
-
-    const statValueStyle = new PIXI.TextStyle({
-      fontFamily: 'Arial',
-      fontSize: scale(16),
-      fontWeight: 'bold',
-      fill: '#555555',
-    });
-
-    // Row 1: Date
-    const t = (key: string) => LanguageManager.getInstance().t(key);
-    const labelText = this.levelData.isPublished ? t('level.published') : t('level.created');
-    const dateLabel = new PIXI.Text({ text: labelText, style: statLabelStyle });
-    const dateValue = new PIXI.Text({ text: dateStr, style: statValueStyle });
-    dateValue.x = dateLabel.width;
-
-    const dateRow = new PIXI.Container();
-    dateRow.addChild(dateLabel, dateValue);
-    statsContainer.addChild(dateRow);
-
-    // Row 2: Attempts & Clears
-
-    // Attempts
-    const attemptsLabel = new PIXI.Text({ text: t('level.attempts'), style: statLabelStyle });
-    const attemptsValue = new PIXI.Text({ text: attempts.toString(), style: statValueStyle });
-    attemptsValue.x = attemptsLabel.width;
-
-    const attemptsContainer = new PIXI.Container();
-    attemptsContainer.addChild(attemptsLabel, attemptsValue);
-    attemptsContainer.position.set(scale(180), 0);
-    statsContainer.addChild(attemptsContainer);
-
-    // Clears
     const percentage = attempts > 0 ? Math.round((clears / attempts) * 100) : 0;
-    const clearsText = `${clears} (${percentage}%)`;
+    textStats.addChild(createStatRow(t('level.clears'), `${clears} (${percentage}%)`, scale(50)));
 
-    const clearsLabel = new PIXI.Text({ text: t('level.clears'), style: statLabelStyle });
-    const clearsValue = new PIXI.Text({ text: clearsText, style: statValueStyle });
-    clearsValue.x = clearsLabel.width;
+    // 2b. Like Button (Right of Stats)
+    const likeBtnWidth = scale(100);
+    const likeBtnHeight = scale(36);
+    const likeBtn = this.createLikeButton(this.levelData.likes || 0, likeBtnWidth, likeBtnHeight);
 
-    const clearsContainer = new PIXI.Container();
-    clearsContainer.addChild(clearsLabel, clearsValue);
-    clearsContainer.position.set(scale(310), 0);
-    statsContainer.addChild(clearsContainer);
+    // Position Like button at the right edge of the left column
+    // Vertically center with the text stats block (roughly 75px height)
+    likeBtn.position.set(previewWidth - likeBtnWidth, (scale(75) - likeBtnHeight) / 2);
+    infoContainer.addChild(likeBtn);
 
-    // 4. Right Side Info Panel
-    const rightPanelX = padding + previewWidth + scale(20);
-    const rightPanelWidth = cardWidth - rightPanelX - padding;
+    // --- RIGHT COLUMN (Author) ---
+    const rightCol = new PIXI.Container();
+    rightCol.position.set(padding + finalLeftWidth + gap, padding);
+    card.addChild(rightCol);
 
-    const rightPanel = new PIXI.Container();
-    rightPanel.position.set(rightPanelX, padding);
-    card.addChild(rightPanel);
+    // Create Sub-Card for Author Info
+    // Height should match previewHeight + statsAreaHeight roughly
+    // Or just be enough to contain the content with some padding.
+    // Let's make it match the Left Column height for visual balance? 
+    // Left Column Height = previewHeight + scale(15) + scale(80) (stats area)
+    const subCardHeight = previewHeight + statsAreaHeight;
+    const subCardWidth = finalRightWidth;
 
-    // --- Author Info (Right Panel Content) ---
-    const avatarRadius = scale(60);
-    const centerX = rightPanelWidth / 2;
-    const topMargin = 0;
+    // Sub-Card Shadow
+    const scShadow = new PIXI.Graphics();
+    scShadow.rect(0, 0, subCardWidth, subCardHeight);
+    scShadow.fill({ color: 0x000000, alpha: 0.1 });
+    scShadow.filters = [new PIXI.BlurFilter({ strength: scale(4), quality: 3 })];
+    scShadow.position.set(0, scale(2));
+    rightCol.addChild(scShadow);
+
+    // Sub-Card Background (White, standard sharp corners as requested "sharp corners... pure white rect")
+    // User asked for "sharp corners" (尖角)
+    const scBg = new PIXI.Graphics();
+    scBg.rect(0, 0, subCardWidth, subCardHeight);
+    scBg.fill(0xFFFFFF);
+    rightCol.addChild(scBg);
+
+    const centerX = subCardWidth / 2;
 
     // Avatar
+    const avatarRadius = scale(40); // Slightly smaller to fit better
+    let topY = scale(30);
+
     const avatar = new PIXI.Container();
-    avatar.position.set(centerX, topMargin + avatarRadius);
-    rightPanel.addChild(avatar);
+    avatar.position.set(centerX, topY + avatarRadius);
+    rightCol.addChild(avatar);
 
     let profileColor = this.userColor;
     let profileUrl: string | undefined;
-
     if (this.levelData.authorId === CURRENT_USER_ID) {
       const profile = MockLevelService.getInstance().getUserProfile();
       profileColor = profile.avatarColor;
@@ -223,151 +233,82 @@ export class UserProfileCard extends PIXI.Container {
     if (profileUrl) {
       PIXI.Assets.load(profileUrl).then((texture) => {
         if (avatar.destroyed) return;
-        const sprite = new PIXI.Sprite(texture);
-        const aspect = sprite.width / sprite.height;
-        if (aspect > 1) {
-          sprite.height = avatarRadius * 2;
-          sprite.width = sprite.height * aspect;
-        } else {
-          sprite.width = avatarRadius * 2;
-          sprite.height = sprite.width / aspect;
-        }
-        sprite.anchor.set(0.5);
-
-        const mask = new PIXI.Graphics();
-        mask.circle(0, 0, avatarRadius);
-        mask.fill(0xFFFFFF);
-        sprite.mask = mask;
-
-        avatar.addChild(mask);
-        avatar.addChild(sprite);
+        const s = new PIXI.Sprite(texture);
+        const asp = s.width / s.height;
+        if (asp > 1) { s.height = avatarRadius * 2; s.width = s.height * asp; }
+        else { s.width = avatarRadius * 2; s.height = s.width / asp; }
+        s.anchor.set(0.5);
+        const m = new PIXI.Graphics(); m.circle(0, 0, avatarRadius); m.fill(0xFFFFFF); s.mask = m;
+        avatar.addChild(m); avatar.addChild(s);
       });
     }
 
     const baseCircle = new PIXI.Graphics();
     baseCircle.circle(0, 0, avatarRadius);
-    // If we have an avatar URL, use white background to support transparency
-    if (profileUrl) {
-      baseCircle.fill(0xFFFFFF);
-    } else {
-      baseCircle.fill(profileColor);
-    }
+    baseCircle.fill(profileUrl ? 0xFFFFFF : profileColor);
     baseCircle.stroke({ width: scale(4), color: 0xE0E0E0 });
     avatar.addChildAt(baseCircle, 0);
 
+    topY += (avatarRadius * 2) + scale(15);
+
     // Name
-    // Name
-    const nameStyle = new PIXI.TextStyle({
-      fontFamily: 'Arial',
-      fontSize: scale(26),
-      fontWeight: 'bold',
-      fill: '#555555',
-      align: 'center',
-    });
-
-    let nameString = this.levelData.author || 'Unknown';
-    const maxNameWidth = rightPanelWidth - scale(20);
-
-    const measureText = new PIXI.Text({ text: nameString, style: nameStyle });
-    if (measureText.width > maxNameWidth) {
-      let tempStr = nameString;
-      while (tempStr.length > 0) {
-        tempStr = tempStr.slice(0, -1);
-        measureText.text = tempStr + '...';
-        if (measureText.width <= maxNameWidth) {
-          nameString = tempStr + '...';
-          break;
-        }
-      }
-    }
-    measureText.destroy();
-
+    const nameString = this.levelData.author || 'Unknown';
     const nameText = new PIXI.Text({
       text: nameString,
-      style: nameStyle
+      style: { fontFamily: 'Arial', fontSize: scale(20), fontWeight: 'bold', fill: '#555555', align: 'center', wordWrap: true, wordWrapWidth: subCardWidth - scale(20) }
     });
     nameText.anchor.set(0.5, 0);
-    nameText.position.set(centerX, topMargin + (avatarRadius * 2) + scale(10));
-    rightPanel.addChild(nameText);
+    nameText.position.set(centerX, topY);
+    rightCol.addChild(nameText);
 
-    // Stats (Below Name)
+    topY += nameText.height + scale(5);
+
+    // User Stats (Total Levels)
     const statsText = new PIXI.Text({
-      text: t('profile.total_levels') + '42', // Mock
-      style: {
-        fontFamily: 'Arial',
-        fontSize: scale(16),
-        fill: '#AAAAAA',
-        align: 'center'
-      }
+      text: t('profile.total_levels') + '42',
+      style: { fontFamily: 'Arial', fontSize: scale(14), fill: '#AAAAAA', align: 'center' }
     });
     statsText.anchor.set(0.5, 0);
-    statsText.position.set(centerX, nameText.y + nameText.height + scale(4));
-    rightPanel.addChild(statsText);
+    statsText.position.set(centerX, topY);
+    rightCol.addChild(statsText);
 
-    // --- Actions (Bottom of Right Panel) ---
-    // Actions should align with the bottom of the visible area
-    const bottomY = previewHeight + statsHeight;
+    // View Levels / Delete Button
+    const actionBtn = (this.levelData.authorId === CURRENT_USER_ID && this.allowDelete)
+      ? this.createDeleteButton(subCardWidth - scale(40))
+      : this.createViewLevelsButton(subCardWidth - scale(40));
 
-    const gap = scale(15);
-    const btnWidth = (rightPanelWidth - gap) / 2;
+    // Align near bottom of sub-card
+    actionBtn.position.set(centerX, subCardHeight - scale(30)); // 30px padding from bottom
 
-    // View Levels Button OR Delete Button (Bottom Right of Panel)
-    if (this.levelData.authorId === CURRENT_USER_ID && this.allowDelete) {
-      // Only show Delete if it is my level AND we are in "Mine" mode (allowDelete=true)
-      const deleteBtn = this.createDeleteButton(btnWidth);
-      deleteBtn.position.set(rightPanelWidth, bottomY - scale(36));
-      rightPanel.addChild(deleteBtn);
-    } else {
-      // Show View Levels Button (Default for others, or for Me in Latest/Popular view)
-      const viewBtn = this.createViewLevelsButton(btnWidth);
-      viewBtn.position.set(rightPanelWidth, bottomY - scale(36));
-      rightPanel.addChild(viewBtn);
-    }
+    rightCol.addChild(actionBtn);
 
-    // Like Button (Bottom Left of Panel)
-    const likeBtn = this.createLikeButton(this.levelData.likes || 0, btnWidth);
-    // Helper draws `roundRect(0, 0, w, h)`, so origin is Top-Left.
-    likeBtn.position.set(0, bottomY - scale(36));
-    rightPanel.addChild(likeBtn);
-
-
-    // Close Button (Top Right of Card)
+    // Close Button (Relative to Sub-Card Right Top? Or Main Card?)
+    // User requested Right Side Elements in a card. Usually Close btn is global to the modal.
+    // Let's keep Close Button on the Main Card for better UX (outside the content flow).
     const closeBtn = new PIXI.Container();
     const closeSize = scale(40);
-
-    // Hit Area
     const closeHit = new PIXI.Graphics();
     closeHit.rect(0, 0, closeSize, closeSize);
     closeHit.fill({ color: 0xFFFFFF, alpha: 0.001 });
     closeBtn.addChild(closeHit);
-
-    const closeX = new PIXI.Text({
-      text: '×',
-      style: {
-        fontFamily: 'Arial',
-        fontSize: scale(32),
-        fill: '#AAAAAA'
-      }
-    });
+    const closeX = new PIXI.Text({ text: '×', style: { fontFamily: 'Arial', fontSize: scale(32), fill: '#AAAAAA' } });
     closeX.anchor.set(0.5);
     closeX.position.set(closeSize / 2, closeSize / 2);
     closeBtn.addChild(closeX);
-
     closeBtn.position.set(cardWidth - closeSize - scale(5), scale(5));
     closeBtn.eventMode = 'static';
     closeBtn.cursor = 'pointer';
     closeBtn.on('pointertap', () => this.onCloseCallback());
-
     card.addChild(closeBtn);
   }
 
-  private createLikeButton(initialLikes: number, width: number): PIXI.Container {
+  private createLikeButton(initialLikes: number, width: number, height?: number): PIXI.Container {
     const container = new PIXI.Container();
 
     // Button styling
     const w = width;
-    const h = scale(36);
-    const r = h / 2;
+    const h = height || scale(36);
+    const r = h / 2; // Fully rounded (Pill shape)
 
     const bg = new PIXI.Graphics();
     // Default: Outline
@@ -381,7 +322,7 @@ export class UserProfileCard extends PIXI.Container {
       text: '\uF406', // hand-thumbs-up-fill
       style: {
         fontFamily: 'bootstrap-icons',
-        fontSize: scale(16),
+        fontSize: scale(20),
         fill: '#FF6B6B',
         padding: scale(5)
       }
@@ -395,7 +336,7 @@ export class UserProfileCard extends PIXI.Container {
       text: count.toString(),
       style: {
         fontFamily: 'Arial',
-        fontSize: scale(18),
+        fontSize: scale(24),
         fill: '#FF6B6B',
         fontWeight: 'bold'
       }
@@ -404,9 +345,7 @@ export class UserProfileCard extends PIXI.Container {
     container.addChild(countText);
 
     const updateLayout = () => {
-      const spacing = scale(8);
-      // Wait for next frame or assume width is available?
-      // Text width is usually available immediately after creation in V8 if font loaded.
+      const spacing = scale(12);
       const totalW = icon.width + spacing + countText.width;
       const startX = (w - totalW) / 2;
 
@@ -444,19 +383,13 @@ export class UserProfileCard extends PIXI.Container {
       }
     };
 
-    // Set initial visual state
     updateVisuals();
 
     container.on('pointertap', () => {
       liked = !liked;
-
-      // Update Data
       this.levelData.isLikedByCurrentUser = liked;
       this.levelData.likes = baseCount + (liked ? 1 : 0);
-
       if (this.onLikeToggleCallback) this.onLikeToggleCallback();
-
-      // Update UI
       updateVisuals();
     });
 
@@ -469,7 +402,7 @@ export class UserProfileCard extends PIXI.Container {
     const container = new PIXI.Container();
 
     const bg = new PIXI.Graphics();
-    bg.roundRect(-w, 0, w, h, h / 2); // Draw from -w to 0 to align right
+    bg.roundRect(-w / 2, -h / 2, w, h, h / 2); // Center Anchor
     bg.fill(0x37A4E9); // Blue
     container.addChild(bg);
 
@@ -483,7 +416,6 @@ export class UserProfileCard extends PIXI.Container {
       }
     });
     text.anchor.set(0.5);
-    text.position.set(-w / 2, h / 2);
     container.addChild(text);
 
     container.eventMode = 'static';
@@ -503,8 +435,8 @@ export class UserProfileCard extends PIXI.Container {
     const container = new PIXI.Container();
 
     const bg = new PIXI.Graphics();
-    bg.roundRect(-w, 0, w, h, h / 2);
-    bg.stroke({ width: 1, color: 0xFF6B6B }); // Red outline
+    bg.roundRect(-w / 2, -h / 2, w, h, h / 2);
+    bg.stroke({ width: 1, color: 0xFF6B6B });
     bg.fill(0xFFFFFF);
     container.addChild(bg);
 
@@ -518,7 +450,6 @@ export class UserProfileCard extends PIXI.Container {
       }
     });
     text.anchor.set(0.5);
-    text.position.set(-w / 2, h / 2);
     container.addChild(text);
 
     container.eventMode = 'static';
