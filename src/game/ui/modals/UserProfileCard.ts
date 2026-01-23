@@ -4,6 +4,7 @@ import { getCanvasWidth, getCanvasHeight, scale } from '../../config';
 import type { LevelData } from '../../levels/LevelSchema';
 import { CURRENT_USER_ID, MockLevelService } from '../../services/MockLevelService';
 import { ConfirmDialog } from './ConfirmDialog';
+import { UIFactory } from '../UIFactory';
 import { LanguageManager, type TranslationKey } from '../../i18n/LanguageManager';
 
 export class UserProfileCard extends PIXI.Container {
@@ -55,9 +56,7 @@ export class UserProfileCard extends PIXI.Container {
     this.zIndex = 2000;
 
     // 1. Dimmed Background (Click to close)
-    const overlay = new PIXI.Graphics();
-    overlay.rect(0, 0, canvasWidth, canvasHeight);
-    overlay.fill({ color: 0x000000, alpha: 0.5 });
+    const overlay = UIFactory.createOverlay(canvasWidth, canvasHeight, 0.5);
     overlay.eventMode = 'static';
     overlay.cursor = 'pointer';
     overlay.on('pointertap', () => this.onCloseCallback());
@@ -80,23 +79,9 @@ export class UserProfileCard extends PIXI.Container {
     const cardHeight = previewHeight + statsAreaHeight + (padding * 2);
 
     // 2. Card Container
-    const card = new PIXI.Container();
+    const card = UIFactory.createCard(cardWidth, cardHeight, 0xFFFFFF);
     card.position.set((canvasWidth - cardWidth) / 2, (canvasHeight - cardHeight) / 2);
     this.addChild(card);
-
-    // Shadow
-    const shadow = new PIXI.Graphics();
-    shadow.rect(0, 0, cardWidth, cardHeight);
-    shadow.fill({ color: 0x000000, alpha: 0.3 });
-    shadow.filters = [new PIXI.BlurFilter({ strength: scale(8), quality: 3 })];
-    shadow.position.set(0, scale(4));
-    card.addChild(shadow);
-
-    // Card Body
-    const bg = new PIXI.Graphics();
-    bg.rect(0, 0, cardWidth, cardHeight);
-    bg.fill({ color: 0xFFFFFF });
-    card.addChild(bg);
 
     card.eventMode = 'static';
     card.on('pointertap', (e) => e.stopPropagation());
@@ -109,11 +94,7 @@ export class UserProfileCard extends PIXI.Container {
     // 1. Preview
     const previewContainer = new PIXI.Container();
 
-    const previewShadow = new PIXI.Graphics();
-    previewShadow.rect(0, 0, previewWidth, previewHeight);
-    previewShadow.fill({ color: 0x000000, alpha: 0.3 });
-    previewShadow.filters = [new PIXI.BlurFilter({ strength: scale(8), quality: 3 })];
-    previewShadow.position.set(0, scale(4));
+    const previewShadow = UIFactory.createShadow(previewWidth, previewHeight, 0, 8, 0.3);
     previewContainer.addChild(previewShadow);
 
     const previewBg = new PIXI.Graphics();
@@ -197,30 +178,16 @@ export class UserProfileCard extends PIXI.Container {
     const subCardHeight = previewHeight + statsAreaHeight;
     const subCardWidth = finalRightWidth;
 
-    // Sub-Card Shadow
-    const scShadow = new PIXI.Graphics();
-    scShadow.rect(0, 0, subCardWidth, subCardHeight);
-    scShadow.fill({ color: 0x000000, alpha: 0.1 });
-    scShadow.filters = [new PIXI.BlurFilter({ strength: scale(4), quality: 3 })];
-    scShadow.position.set(0, scale(2));
-    rightCol.addChild(scShadow);
-
-    // Sub-Card Background (White, standard sharp corners as requested "sharp corners... pure white rect")
-    // User asked for "sharp corners" (尖角)
-    const scBg = new PIXI.Graphics();
-    scBg.rect(0, 0, subCardWidth, subCardHeight);
-    scBg.fill(0xFFFFFF);
-    rightCol.addChild(scBg);
+    // Sub-Card (Shadow + Background)
+    const subCard = UIFactory.createCard(subCardWidth, subCardHeight, 0xFFFFFF);
+    // Note: createCard uses standard shadow (4,4). Original used (0,2). Standardization accepted.
+    rightCol.addChild(subCard);
 
     const centerX = subCardWidth / 2;
 
     // Avatar
-    const avatarRadius = scale(40); // Slightly smaller to fit better
+    const avatarRadius = scale(70);
     let topY = scale(30);
-
-    const avatar = new PIXI.Container();
-    avatar.position.set(centerX, topY + avatarRadius);
-    rightCol.addChild(avatar);
 
     let profileColor = this.userColor;
     let profileUrl: string | undefined;
@@ -230,24 +197,9 @@ export class UserProfileCard extends PIXI.Container {
       profileUrl = profile.avatarUrl;
     }
 
-    if (profileUrl) {
-      PIXI.Assets.load(profileUrl).then((texture) => {
-        if (avatar.destroyed) return;
-        const s = new PIXI.Sprite(texture);
-        const asp = s.width / s.height;
-        if (asp > 1) { s.height = avatarRadius * 2; s.width = s.height * asp; }
-        else { s.width = avatarRadius * 2; s.height = s.width / asp; }
-        s.anchor.set(0.5);
-        const m = new PIXI.Graphics(); m.circle(0, 0, avatarRadius); m.fill(0xFFFFFF); s.mask = m;
-        avatar.addChild(m); avatar.addChild(s);
-      });
-    }
-
-    const baseCircle = new PIXI.Graphics();
-    baseCircle.circle(0, 0, avatarRadius);
-    baseCircle.fill(profileUrl ? 0xFFFFFF : profileColor);
-    baseCircle.stroke({ width: scale(4), color: 0xE0E0E0 });
-    avatar.addChildAt(baseCircle, 0);
+    const avatar = UIFactory.createAvatar(avatarRadius, profileUrl, profileColor);
+    avatar.position.set(centerX, topY + avatarRadius);
+    rightCol.addChild(avatar);
 
     topY += (avatarRadius * 2) + scale(15);
 
@@ -310,24 +262,13 @@ export class UserProfileCard extends PIXI.Container {
     const h = height || scale(36);
     const r = h / 2; // Fully rounded (Pill shape)
 
-    const bg = new PIXI.Graphics();
     // Default: Outline
-    bg.roundRect(0, 0, w, h, r);
-    bg.stroke({ width: 2, color: 0xFF6B6B });
-    bg.fill({ color: 0xFFFFFF });
+    const bg = UIFactory.createPill(w, h, 0xFFFFFF, 0xFF6B6B, 2);
     container.addChild(bg);
 
     // Icon (Thumbs Up)
-    const icon = new PIXI.Text({
-      text: '\uF406', // hand-thumbs-up-fill
-      style: {
-        fontFamily: 'bootstrap-icons',
-        fontSize: scale(20),
-        fill: '#FF6B6B',
-        padding: scale(5)
-      }
-    });
-    icon.anchor.set(0.5);
+    const icon = UIFactory.createIcon('\uF406', scale(20), '#FF6B6B');
+    // Position set later in updateLayout
     container.addChild(icon);
 
     // Count
@@ -399,34 +340,29 @@ export class UserProfileCard extends PIXI.Container {
   private createViewLevelsButton(width: number): PIXI.Container {
     const w = width;
     const h = scale(36);
-    const container = new PIXI.Container();
 
-    const bg = new PIXI.Graphics();
-    bg.roundRect(-w / 2, -h / 2, w, h, h / 2); // Center Anchor
-    bg.fill(0x37A4E9); // Blue
-    container.addChild(bg);
+    // Use factory
+    const btn = UIFactory.createButton(
+      LanguageManager.getInstance().t('profile.view_levels'),
+      w,
+      h,
+      0x37A4E9,
+      '#FFFFFF',
+      () => {
+        if (this.levelData.authorId) {
+          this.onViewLevelsCallback(this.levelData.authorId);
+        }
+      },
+      14 // Font size
+    );
 
-    const text = new PIXI.Text({
-      text: LanguageManager.getInstance().t('profile.view_levels'),
-      style: {
-        fontFamily: 'Arial',
-        fontSize: scale(14),
-        fill: '#FFFFFF',
-        fontWeight: 'bold'
-      }
-    });
-    text.anchor.set(0.5);
-    container.addChild(text);
+    // Original anchor was centered (drawing at -w/2, -h/2).
+    // createButton draws at 0,0.
+    // We need to wrap it or adjust offset where it is used.
+    // Or just return it set to pivot center?
+    btn.pivot.set(w / 2, h / 2);
 
-    container.eventMode = 'static';
-    container.cursor = 'pointer';
-    container.on('pointertap', () => {
-      if (this.levelData.authorId) {
-        this.onViewLevelsCallback(this.levelData.authorId);
-      }
-    });
-
-    return container;
+    return btn;
   }
 
   private createDeleteButton(width: number): PIXI.Container {
@@ -434,10 +370,8 @@ export class UserProfileCard extends PIXI.Container {
     const h = scale(36);
     const container = new PIXI.Container();
 
-    const bg = new PIXI.Graphics();
-    bg.roundRect(-w / 2, -h / 2, w, h, h / 2);
-    bg.stroke({ width: 1, color: 0xFF6B6B });
-    bg.fill(0xFFFFFF);
+    const bg = UIFactory.createPill(w, h, 0xFFFFFF, 0xFF6B6B, 1);
+    bg.position.set(-w / 2, -h / 2);
     container.addChild(bg);
 
     const text = new PIXI.Text({

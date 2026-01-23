@@ -20,6 +20,7 @@ import { PenSelectionUI } from './ui/PenSelectionUI';
 import { EditorUI } from './ui/EditorUI';
 import { TransformGizmo } from './editor/TransformGizmo';
 import { ConfirmDialog } from './ui/modals/ConfirmDialog';
+import { UIFactory } from './ui/UIFactory';
 import { type Pen, DEFAULT_PEN } from './data/PenData';
 import { DrawingManager } from './input/DrawingManager';
 import { LevelManager } from './levels/LevelManager';
@@ -668,28 +669,31 @@ export class Game {
     const btnSpacing = scale(20);
 
     // Home Button (Top Left)
-    this.homeBtnContainer = this.createCanvasButton('\uF284', scale(20), btnY, () => {
+    this.homeBtnContainer = UIFactory.createTopBarButton('\uF284', () => {
       this.showLevelSelection();
     });
+    this.homeBtnContainer.position.set(scale(20), btnY);
     this.uiLayer.addChild(this.homeBtnContainer);
 
     // Restart Button (Top Right)
     const restartX = getCanvasWidth() - scale(20) - btnSize;
-    this.restartBtnContainer = this.createCanvasButton('\uF116', restartX, btnY, () => {
+    this.restartBtnContainer = UIFactory.createTopBarButton('\uF116', () => {
       this.restartLevel();
     });
+    this.restartBtnContainer.position.set(restartX, btnY);
     this.uiLayer.addChild(this.restartBtnContainer);
 
     // Pen Button (Left of Restart)
     const penX = restartX - btnSpacing - btnSize;
-    this.penBtnContainer = this.createCanvasButton('\uF604', penX, btnY, () => {
+    this.penBtnContainer = UIFactory.createTopBarButton('\uF604', () => {
       this.showPenSelection();
     });
+    this.penBtnContainer.position.set(penX, btnY);
     this.uiLayer.addChild(this.penBtnContainer);
 
     // Publish Button (Left of Pen) - Cloud Arrow Up
     const publishX = penX - btnSpacing - btnSize;
-    this.publishBtnContainer = this.createCanvasButton('\uF297', publishX, btnY, async () => {
+    this.publishBtnContainer = UIFactory.createTopBarButton('\uF297', async () => {
       const currentLevel = this.levelManager.getCurrentLevel();
       if (!currentLevel) return;
 
@@ -728,52 +732,12 @@ export class Game {
         () => this.closeConfirmDialog()
       );
     });
+    this.publishBtnContainer.position.set(publishX, btnY);
     this.publishBtnContainer.visible = false; // Default hidden
     this.uiLayer.addChild(this.publishBtnContainer);
   }
 
-  /**
-   * Helper to create a circular icon button
-   */
-  private createCanvasButton(iconChar: string, x: number, y: number, onClick: () => void): PIXI.Container {
-    const size = scale(52);
-    const container = new PIXI.Container();
-    container.position.set(x, y);
 
-    // Invisible Hit Area
-    const hitArea = new PIXI.Graphics();
-    hitArea.rect(0, 0, size, size);
-    hitArea.fill({ color: 0xFFFFFF, alpha: 0.001 }); // Almost invisible but interactive
-    container.addChild(hitArea);
-
-    // Icon Text
-    const text = new PIXI.Text({
-      text: iconChar,
-      style: {
-        fontFamily: 'bootstrap-icons',
-        fontSize: scale(60),
-        fill: '#555555',
-        stroke: { color: '#555555', width: 0.5 },
-        align: 'center',
-        padding: scale(10)
-      }
-    });
-    text.anchor.set(0.5);
-    text.position.set(size / 2, size / 2);
-    container.addChild(text);
-
-    // Interactivity
-    container.eventMode = 'static';
-    container.cursor = 'pointer';
-
-    // Use pointertap instead of pointerup to prevent accidental triggers
-    // when finishing a drawing stroke over the button
-    container.on('pointertap', () => {
-      onClick();
-    });
-
-    return container;
-  }
 
   /**
    * Show Pen Selection UI

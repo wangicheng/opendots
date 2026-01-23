@@ -16,6 +16,7 @@ import { SettingsUI } from './SettingsUI';
 import { type Pen } from '../data/PenData';
 import { UserProfileCard } from './modals/UserProfileCard';
 import { CURRENT_USER_ID, MockLevelService } from '../services/MockLevelService';
+import { UIFactory } from './UIFactory';
 import { LanguageManager, type TranslationKey } from '../i18n/LanguageManager';
 
 export class LevelSelectionUI extends PIXI.Container {
@@ -201,14 +202,6 @@ export class LevelSelectionUI extends PIXI.Container {
     const size = scale(64);
     const container = new PIXI.Container();
 
-    // Shadow
-    const shadow = new PIXI.Graphics();
-    shadow.circle(0, 0, size / 2);
-    shadow.fill({ color: 0x000000, alpha: 0.3 });
-    shadow.filters = [new PIXI.BlurFilter({ strength: 4 })];
-    shadow.position.set(0, 4);
-    container.addChild(shadow);
-
     // Button Circle
     const circle = new PIXI.Graphics();
     circle.circle(0, 0, size / 2);
@@ -304,19 +297,12 @@ export class LevelSelectionUI extends PIXI.Container {
     container.addChild(hitArea);
 
     // Icon Text
-    const text = new PIXI.Text({
-      text: iconChar,
-      style: {
-        fontFamily: 'bootstrap-icons',
-        fontSize: scale(60),
-        fill: '#555555',
-        stroke: { color: '#555555', width: 0.5 },
-        align: 'center',
-        padding: scale(10)
-      }
-    });
-    text.anchor.set(0.5);
-    text.position.set(size / 2, size / 2);
+    const text = UIFactory.createIcon(iconChar, scale(60), '#555555');
+    // Original had stroke. Add it back?
+    text.style.stroke = { color: '#555555', width: 0.5 };
+
+    // Position
+    text.position.set(size / 2, size / 2 + scale(2)); // Added nudge
     container.addChild(text);
 
     // Interactive
@@ -378,17 +364,11 @@ export class LevelSelectionUI extends PIXI.Container {
     const container = new PIXI.Container();
 
     // 1. Shadow (Rect with Blur)
-    const shadow = new PIXI.Graphics();
-    shadow.rect(0, 0, width, height);
-    shadow.fill({ color: 0x000000, alpha: 0.3 });
-    shadow.filters = [new PIXI.BlurFilter({ strength: scale(8), quality: 3 })];
-    shadow.position.set(0, scale(4));
+    const shadow = UIFactory.createShadow(width, height, 0, 8, 0.3);
     container.addChild(shadow);
 
     // 2. Card Body
-    const bg = new PIXI.Graphics();
-    bg.rect(0, 0, width, height);
-    bg.fill({ color: 0xFFFFFF });
+    const bg = UIFactory.createCardBackground(width, height, 0xFFFFFF);
     container.addChild(bg);
 
     // 3. Viewport (Masked Area)
@@ -490,17 +470,8 @@ export class LevelSelectionUI extends PIXI.Container {
       likesContainer.addChild(bg);
 
       // Likes Icon (Thumb Up)
-      const thumbIcon = new PIXI.Text({
-        text: '\uF406', // hand-thumbs-up-fill
-        style: {
-          fontFamily: 'bootstrap-icons',
-          fontSize: iconSize,
-          fill: '#FFFFFF',
-          padding: scale(4)
-        }
-      });
-      thumbIcon.anchor.set(0.5);
-      thumbIcon.position.set(padding + iconSize / 2, pillHeight / 2);
+      const thumbIcon = UIFactory.createIcon('\uF406', iconSize, '#FFFFFF');
+      thumbIcon.position.set(padding + iconSize / 2, pillHeight / 2 + scale(2)); // Nudged
       likesContainer.addChild(thumbIcon);
 
       // Likes Number
@@ -518,9 +489,8 @@ export class LevelSelectionUI extends PIXI.Container {
 
     // Mocking a user avatar with a colored circle
     const avatarRadius = scale(25);
-    const avatar = new PIXI.Container(); // Changed to Container to support Sprite
-    const colors = [0xFF6B6B, 0x4ECDC4, 0x45B7D1, 0xFFBE76, 0xFF7979, 0xBADC58];
     // Hash authorId to get consistent color
+    const colors = [0xFF6B6B, 0x4ECDC4, 0x45B7D1, 0xFFBE76, 0xFF7979, 0xBADC58];
     const authorKey = levelData.authorId || levelData.author || 'unknown';
     let hash = 0;
     for (let i = 0; i < authorKey.length; i++) {
@@ -530,50 +500,15 @@ export class LevelSelectionUI extends PIXI.Container {
     let color = colors[colorIndex]; // Default color
 
     // Check if it's CURRENT USER and use their profile
+    let profileUrl: string | undefined;
     if (levelData.authorId === CURRENT_USER_ID) {
       const profile = MockLevelService.getInstance().getUserProfile();
       color = profile.avatarColor; // Override color
-
-      if (profile.avatarUrl) {
-        PIXI.Assets.load(profile.avatarUrl).then((texture) => {
-          if (avatar.destroyed) return;
-          const sprite = new PIXI.Sprite(texture);
-          // Aspect Fill logic for small circle
-          const aspect = sprite.width / sprite.height;
-          if (aspect > 1) {
-            sprite.height = avatarRadius * 2;
-            sprite.width = sprite.height * aspect;
-          } else {
-            sprite.width = avatarRadius * 2;
-            sprite.height = sprite.width / aspect;
-          }
-          sprite.anchor.set(0.5);
-
-          const mask = new PIXI.Graphics();
-          mask.circle(0, 0, avatarRadius);
-          mask.fill(0xFFFFFF);
-          sprite.mask = mask;
-
-          avatar.addChild(mask);
-          avatar.addChild(sprite);
-
-          // Remove fallback graphic if exists (though we are appending, so maybe just don't add fallback if we have url? 
-          // Since load is async, we need a placeholder first.
-          // Let's just overlay the sprite on top of the base circle
-        });
-      }
+      profileUrl = profile.avatarUrl;
     }
 
-    const baseCircle = new PIXI.Graphics();
-    baseCircle.circle(0, 0, avatarRadius);
-    // If we have a custom avatar, the background should be white to handle transparency
-    if (levelData.authorId === CURRENT_USER_ID && MockLevelService.getInstance().getUserProfile().avatarUrl) {
-      baseCircle.fill(0xFFFFFF);
-    } else {
-      baseCircle.fill(color);
-    }
-    baseCircle.stroke({ width: scale(3), color: 0xFFFFFF });
-    avatar.addChildAt(baseCircle, 0); // Background/Fallback
+    // Use UIFactory to create avatar
+    const avatar = UIFactory.createAvatar(avatarRadius, profileUrl, color, 0xFFFFFF); // White border
 
     // Position to slightly protrude from the corner (center closer to the corner)
     avatar.position.set(width - scale(4), height - scale(4));

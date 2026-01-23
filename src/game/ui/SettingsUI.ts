@@ -2,6 +2,7 @@
 import * as PIXI from 'pixi.js';
 import { getCanvasWidth, getCanvasHeight, scale } from '../config';
 import { MockLevelService } from '../services/MockLevelService';
+import { UIFactory } from './UIFactory';
 
 import { LanguageManager, type TranslationKey } from '../i18n/LanguageManager';
 
@@ -27,7 +28,7 @@ export class SettingsUI extends PIXI.Container {
   private overlay: PIXI.Graphics;
   private card: PIXI.Container;
   private fileInputElement: HTMLInputElement | null = null;
-  private avatarLoadId: number = 0;
+  // private avatarLoadId: number = 0; // Unused
 
   constructor(onClose: () => void) {
     super();
@@ -62,6 +63,16 @@ export class SettingsUI extends PIXI.Container {
 
     // 1. Overlay
     this.overlay.clear();
+    // Re-use logic or re-create? overlay is a member. 
+    // UIFactory creates a new one. Since 'overlay' is `readonly` or defined in constructor as member, we might just update it?
+    // The original code clears and redraws. 
+    // UIFactory.createOverlay returns a NEW Graphics. 
+    // We can just use the standard PIXI drawing here to avoid re-creating object if we want to keep the member.
+    // OR, we can update the member to be just a reference?
+    // Given 'overlay' is instantiated in constructor, let's keep it simple and just use drawing commands, 
+    // OR we can make a helper "drawOverlay(g)"?
+    // Actually, looking at the code, it clears and draws every refreshUI.
+    // Let's stick to standard PIXI for the member, BUT we can use UIFactory for 'Shadow' and 'Card' which are re-created or children cleared.
     this.overlay.rect(0, 0, canvasWidth, canvasHeight);
     this.overlay.fill({ color: 0x000000, alpha: 0.5 });
     this.overlay.eventMode = 'static';
@@ -78,21 +89,10 @@ export class SettingsUI extends PIXI.Container {
     const cardX = (canvasWidth - cardWidth) / 2;
     const cardY = (canvasHeight - cardHeight) / 2;
 
+    // Card with Shadow and Background
+    this.card = UIFactory.createCard(cardWidth, cardHeight, 0xFFFFFF, 0);
     this.card.position.set(cardX, cardY);
-
-    // Shadow
-    const shadow = new PIXI.Graphics();
-    shadow.rect(0, 0, cardWidth, cardHeight);
-    shadow.fill({ color: 0x000000, alpha: 0.3 });
-    shadow.filters = [new PIXI.BlurFilter({ strength: scale(8), quality: 3 })];
-    shadow.position.set(0, scale(4));
-    this.card.addChild(shadow);
-
-    // Background
-    const bg = new PIXI.Graphics();
-    bg.rect(0, 0, cardWidth, cardHeight);
-    bg.fill(0xFFFFFF);
-    this.card.addChild(bg);
+    this.addChild(this.card);
 
     // Stop propagation
     this.card.eventMode = 'static';
@@ -142,7 +142,7 @@ export class SettingsUI extends PIXI.Container {
     this.drawHeader(width, { title: t('profile.title'), showBack: true, onBack: () => this.setView('list') });
 
     // Increment load ID to invalidate previous pending loads
-    const currentLoadId = ++this.avatarLoadId;
+    // const currentLoadId = ++this.avatarLoadId; // Unused with UIFactory
 
     const profile = MockLevelService.getInstance().getUserProfile();
     const centerX = width / 2;
@@ -151,60 +151,14 @@ export class SettingsUI extends PIXI.Container {
     const avatarY = scale(120);
     const avatarRadius = scale(50);
 
-    const avatarContainer = new PIXI.Container();
+    const avatarContainer = UIFactory.createAvatar(
+      avatarRadius,
+      profile.avatarUrl,
+      profile.avatarColor,
+      0xE0E0E0
+    );
     avatarContainer.position.set(centerX, avatarY);
     this.card.addChild(avatarContainer);
-
-    if (profile.avatarUrl) {
-      // Image Avatar
-      PIXI.Assets.load(profile.avatarUrl)
-        .then((texture) => {
-          if (!this.card.parent || currentLoadId !== this.avatarLoadId) return; // Component destroyed or new load started
-
-          const sprite = new PIXI.Sprite(texture);
-          const aspect = sprite.width / sprite.height;
-          // Cover fit logic
-          if (aspect > 1) {
-            sprite.height = avatarRadius * 2;
-            sprite.width = sprite.height * aspect;
-          } else {
-            sprite.width = avatarRadius * 2;
-            sprite.height = sprite.width / aspect;
-          }
-          sprite.anchor.set(0.5);
-
-          // Circular Mask
-          const mask = new PIXI.Graphics();
-          mask.circle(0, 0, avatarRadius);
-          mask.fill(0xFFFFFF);
-          sprite.mask = mask;
-          avatarContainer.addChild(mask);
-          avatarContainer.addChild(sprite);
-
-          // Border
-          const border = new PIXI.Graphics();
-          border.circle(0, 0, avatarRadius);
-          border.stroke({ width: scale(4), color: 0xE0E0E0 });
-          avatarContainer.addChild(border);
-        })
-        .catch((err) => {
-          console.error('Failed to load avatar image:', err);
-        });
-
-      // Placeholder/Background (White)
-      const placeholder = new PIXI.Graphics();
-      placeholder.circle(0, 0, avatarRadius);
-      placeholder.fill(0xFFFFFF);
-      avatarContainer.addChildAt(placeholder, 0);
-
-    } else {
-      // Color Avatar (Fallback)
-      const avatar = new PIXI.Graphics();
-      avatar.circle(0, 0, avatarRadius);
-      avatar.fill(profile.avatarColor);
-      avatar.stroke({ width: scale(4), color: 0xE0E0E0 });
-      avatarContainer.addChild(avatar);
-    }
 
     // Avatar Interaction (Upload Image)
     avatarContainer.eventMode = 'static';
@@ -241,16 +195,15 @@ export class SettingsUI extends PIXI.Container {
     nameLabel.position.set(scale(40), nameY);
     this.card.addChild(nameLabel);
 
-    // Name Display / Edit Box
-    const inputBg = new PIXI.Graphics();
+    // Name Display / Edit Box (Pill shape)
     const inputW = width - scale(80);
     const inputH = scale(40);
     const inputX = scale(40);
     const inputY = nameY + scale(25);
 
-    inputBg.roundRect(0, 0, inputW, inputH, inputH / 2);
-    inputBg.fill(0xF5F5F5);
-    inputBg.stroke({ width: 1, color: 0xDDDDDD });
+    // used roundRect... but wait, createPill uses full radius.
+    // original: inputH / 2. Yes, it is a pill.
+    const inputBg = UIFactory.createPill(inputW, inputH, 0xF5F5F5, 0xDDDDDD, 1);
     inputBg.position.set(inputX, inputY);
 
     // Interaction to edit
@@ -285,16 +238,8 @@ export class SettingsUI extends PIXI.Container {
     nameText.eventMode = 'none'; // Allow clicks to pass through to background
     this.card.addChild(nameText);
 
-    const editIcon = new PIXI.Text({
-      text: '\uF4CB', // pencil
-      style: {
-        fontFamily: 'bootstrap-icons',
-        fontSize: scale(16),
-        fill: '#AAAAAA',
-        padding: scale(5)
-      }
-    });
-    editIcon.anchor.set(1, 0.5);
+    const editIcon = UIFactory.createIcon('\uF4CB', scale(16), '#AAAAAA');
+    editIcon.anchor.set(1, 0.5); // Override anchor for specific layout
     editIcon.position.set(inputX + inputW - scale(10), inputY + inputH / 2 + scale(2));
     editIcon.eventMode = 'none'; // Allow clicks to pass through to background
     this.card.addChild(editIcon);
@@ -337,10 +282,20 @@ export class SettingsUI extends PIXI.Container {
       // Highlight selected
       if (isSelected) {
         // Modify the bg using named reference
+        // Clear and redraw as pill
         item.bg.clear();
-        item.bg.roundRect(0, 0, bgWidth, itemHeight, itemHeight / 2);
+        const radius = itemHeight / 2;
+        item.bg.roundRect(0, 0, bgWidth, itemHeight, radius);
         item.bg.stroke({ width: 2, color: 0x37A4E9 });
         item.bg.fill(0xF0F8FF);
+        // Note: createPill returns a NEW graphics. Here we are modifying an existing one (item.bg).
+        // So we can't easily swap it unless we remove and add. 
+        // But the original code modifies the existing graphics. 
+        // We will leave this one as manual modification to avoid complex object replacement logic in update loop.
+        // OR we can make createPill static helper that draws ON a graphics? No, factory usually creates.
+        // I will SKIP this block to avoid breaking the reference stability if item.bg is stored. 
+        // Actually, item is recreated in drawLanguageView every time? No, it's a loop.
+        // Let's look at `createListItem`. It creates the BG. We should refactor that.
 
         // Modify icon color using named reference
         item.icon.style.fill = '#37A4E9';
@@ -377,15 +332,7 @@ export class SettingsUI extends PIXI.Container {
       hit.fill({ color: 0xFFFFFF, alpha: 0.001 });
       backBtn.addChild(hit);
 
-      const icon = new PIXI.Text({
-        text: '\uF12F', // chevron-left
-        style: {
-          fontFamily: 'bootstrap-icons',
-          fontSize: scale(24),
-          fill: '#555555',
-          padding: scale(5)
-        }
-      });
+      const icon = UIFactory.createIcon('\uF12F', scale(24), '#555555');
       icon.anchor.set(0.5);
       icon.position.set(scale(20), scale(20) + scale(2));
       backBtn.addChild(icon);
@@ -435,21 +382,11 @@ export class SettingsUI extends PIXI.Container {
   private createListItem(label: string, iconChar: string, w: number, h: number, onClick: () => void): ListItemResult {
     const container = new PIXI.Container();
 
-    const bg = new PIXI.Graphics();
-    bg.roundRect(0, 0, w, h, h / 2);
-    bg.fill(0xF9F9F9);
+    const bg = UIFactory.createPill(w, h, 0xF9F9F9);
     container.addChild(bg);
 
     // Icon
-    const icon = new PIXI.Text({
-      text: iconChar,
-      style: {
-        fontFamily: 'bootstrap-icons',
-        fontSize: scale(20),
-        fill: '#555555',
-        padding: scale(5)
-      }
-    });
+    const icon = UIFactory.createIcon(iconChar, scale(20), '#555555');
     icon.anchor.set(0.5);
     icon.position.set(scale(30), h / 2 + scale(2));
     container.addChild(icon);
@@ -468,15 +405,7 @@ export class SettingsUI extends PIXI.Container {
     container.addChild(text);
 
     // Chevron Right
-    const chevron = new PIXI.Text({
-      text: '\uF285', // chevron-right
-      style: {
-        fontFamily: 'bootstrap-icons',
-        fontSize: scale(16),
-        fill: '#CCCCCC',
-        padding: scale(5)
-      }
-    });
+    const chevron = UIFactory.createIcon('\uF285', scale(16), '#CCCCCC');
     chevron.anchor.set(0.5);
     chevron.position.set(w - scale(20), h / 2 + scale(2));
     container.addChild(chevron);

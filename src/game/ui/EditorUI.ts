@@ -4,6 +4,7 @@ import {
   getCanvasHeight,
   scale,
 } from '../config';
+import { UIFactory } from './UIFactory';
 import { LanguageManager, type TranslationKey } from '../i18n/LanguageManager';
 
 // Local visual constants matches object definitions
@@ -81,7 +82,9 @@ export class EditorUI extends PIXI.Container {
     const margin = scale(EDITOR_LAYOUT.MARGIN);
 
     // Back Button (Left)
-    this.backBtn = this.createButton('\uF284', margin, btnY, this.onClose);
+    this.backBtn = UIFactory.createTopBarButton('\uF284', this.onClose);
+    this.backBtn.position.set(margin, btnY);
+    this.addChild(this.backBtn);
 
     // Edit/Play Toggle (Center)
     // Align center of toggle with center of buttons
@@ -94,11 +97,15 @@ export class EditorUI extends PIXI.Container {
 
     // Delete Button (Rightmost)
     const deleteX = width - margin - btnSize;
-    this.deleteBtn = this.createButton('\uF78A', deleteX, btnY, this.onDelete, this.toolsContainer);
+    this.deleteBtn = UIFactory.createTopBarButton('\uF78A', this.onDelete);
+    this.deleteBtn.position.set(deleteX, btnY);
+    this.toolsContainer.addChild(this.deleteBtn);
 
     // Copy Button (Left of Delete)
     const copyX = deleteX - btnSpacing - btnSize;
-    this.copyBtn = this.createButton('\uF759', copyX, btnY, this.onCopy, this.toolsContainer);
+    this.copyBtn = UIFactory.createTopBarButton('\uF759', this.onCopy);
+    this.copyBtn.position.set(copyX, btnY);
+    this.toolsContainer.addChild(this.copyBtn);
 
     // Restore tool state
     this.updateTools(this.lastHasSelection, this.lastIsBall);
@@ -108,17 +115,23 @@ export class EditorUI extends PIXI.Container {
 
     // Play Mode Buttons (Mimic Game.ts UI)
     // Home Button (Top Left) - Returns to Edit Mode
-    this.playHomeBtn = this.createButton('\uF284', margin, btnY, () => {
+    this.playHomeBtn = UIFactory.createTopBarButton('\uF284', () => {
       this.onClose();
     });
+    this.playHomeBtn.position.set(margin, btnY);
+    this.addChild(this.playHomeBtn);
 
     // Restart Button (Top Right)
     const restartX = width - margin - btnSize;
-    this.playRestartBtn = this.createButton('\uF116', restartX, btnY, this.onRestart);
+    this.playRestartBtn = UIFactory.createTopBarButton('\uF116', this.onRestart);
+    this.playRestartBtn.position.set(restartX, btnY);
+    this.addChild(this.playRestartBtn);
 
     // Pen Button (Left of Restart)
     const penX = restartX - btnSpacing - btnSize;
-    this.playPenBtn = this.createButton('\uF604', penX, btnY, this.onPen);
+    this.playPenBtn = UIFactory.createTopBarButton('\uF604', this.onPen);
+    this.playPenBtn.position.set(penX, btnY);
+    this.addChild(this.playPenBtn);
 
     // Restore UI State (Visibility)
     this.setUIState(this.currentMode);
@@ -282,45 +295,7 @@ export class EditorUI extends PIXI.Container {
     this.deleteBtn.eventMode = mode;
   }
 
-  private createButton(iconChar: string, x: number, y: number, onClick: () => void, parent?: PIXI.Container): PIXI.Container {
-    const size = scale(52); // Match Game.ts button size
-    const container = new PIXI.Container();
-    container.position.set(x, y);
 
-    // Invisible Hit Area
-    const hitArea = new PIXI.Graphics();
-    hitArea.rect(0, 0, size, size);
-    hitArea.fill({ color: 0xFFFFFF, alpha: 0.001 });
-    container.addChild(hitArea);
-
-    // Icon Text (Matched style from Game.ts)
-    const text = new PIXI.Text({
-      text: iconChar,
-      style: {
-        fontFamily: 'bootstrap-icons',
-        fontSize: scale(60), // Match Game.ts font size
-        fill: '#555555',
-        stroke: { color: '#555555', width: 0.5 },
-        align: 'center',
-        padding: scale(10)
-      }
-    });
-    text.anchor.set(0.5);
-    text.position.set(size / 2, size / 2);
-    container.addChild(text);
-
-    container.eventMode = 'static';
-    container.cursor = 'pointer';
-    container.on('pointertap', onClick);
-
-    if (parent) {
-      parent.addChild(container);
-    } else {
-      this.addChild(container);
-    }
-
-    return container;
-  }
 
   private createBottomBar(): void {
     const width = getCanvasWidth();

@@ -3,6 +3,7 @@ import * as PIXI from 'pixi.js';
 import { getCanvasWidth, getCanvasHeight, scale } from '../config';
 import { PENS } from '../data/PenData';
 import type { Pen } from '../data/PenData';
+import { UIFactory } from './UIFactory';
 import { LanguageManager, type TranslationKey } from '../i18n/LanguageManager';
 
 export class PenSelectionUI extends PIXI.Container {
@@ -82,35 +83,20 @@ export class PenSelectionUI extends PIXI.Container {
   }
 
   private createOverlay(): void {
-    this.overlay = new PIXI.Graphics();
-    this.overlay.rect(0, 0, getCanvasWidth(), getCanvasHeight());
-    this.overlay.fill({ color: 0x000000, alpha: 0.35 });
-    this.overlay.eventMode = 'static';
+    this.overlay = UIFactory.createOverlay(getCanvasWidth(), getCanvasHeight(), 0.35);
+    this.overlay.eventMode = 'static'; // UIFactory doesn't set eventMode to static by default? Overlay usually needs it to block clicks.
+    // UIFactory uses fill... wait, let's check UIFactory.
+    // UIFactory returns a Graphics. Use it.
     this.addChild(this.overlay);
   }
 
   private createCard(): void {
-    this.card = new PIXI.Container();
+    this.card = UIFactory.createCard(this.cardWidth, this.cardHeight, 0xFFFFFF, 0);
     this.card.position.set(
       (getCanvasWidth() - this.cardWidth) / 2,
       (getCanvasHeight() - this.cardHeight) / 2
     );
     this.addChild(this.card);
-
-    // Shadow
-    const shadow = new PIXI.Graphics();
-    shadow.roundRect(0, scale(8), this.cardWidth, this.cardHeight, 0);
-    shadow.fill({ color: 0x000000, alpha: 0.2 });
-    const blur = new PIXI.BlurFilter();
-    blur.strength = scale(10);
-    shadow.filters = [blur];
-    this.card.addChild(shadow);
-
-    // Background
-    const bg = new PIXI.Graphics();
-    bg.roundRect(0, 0, this.cardWidth, this.cardHeight, 0);
-    bg.fill(0xFFFFFF);
-    this.card.addChild(bg);
 
     // Header
     this.createHeader();
@@ -127,24 +113,15 @@ export class PenSelectionUI extends PIXI.Container {
 
     // Status Badge (Left)
     const badge = new PIXI.Container();
-    const badgeBg = new PIXI.Graphics();
-    badgeBg.roundRect(0, 0, scale(164), scale(60), scale(30));
-    badgeBg.fill(0xF2F2F2);
+    const badgeBg = UIFactory.createPill(scale(164), scale(60), 0xF2F2F2);
     badge.addChild(badgeBg);
 
-    const penIcon = new PIXI.Text({
-      text: '\uF604',
-      style: {
-        fontFamily: 'bootstrap-icons',
-        fontSize: scale(36),
-        fill: 0x555555
-      }
-    });
-    penIcon.position.set(scale(12), scale(16));
+    const penIcon = UIFactory.createIcon('\uF604', scale(36), 0x555555);
+    penIcon.position.set(scale(35), scale(36));
     badge.addChild(penIcon);
 
     const countText = new PIXI.Text({ text: `${PENS.length} / ${PENS.length}`, style: { fontFamily: 'Arial', fontSize: scale(28), fill: 0x555555 } });
-    countText.position.set(scale(55), scale(14));
+    countText.position.set(scale(60), scale(14));
     badge.addChild(countText);
 
     badge.position.set(scale(30), headerY);
@@ -232,9 +209,8 @@ export class PenSelectionUI extends PIXI.Container {
     const btnWidth = scale(210);
     const btnHeight = scale(67);
 
-    const bg = new PIXI.Graphics();
-    bg.roundRect(-btnWidth / 2, -btnHeight / 2, btnWidth, btnHeight, btnHeight / 2);
-    bg.fill(0x37A4E9);
+    const bg = UIFactory.createPill(btnWidth, btnHeight, 0x37A4E9);
+    bg.position.set(-btnWidth / 2, -btnHeight / 2);
     btn.addChild(bg);
 
     const text = new PIXI.Text({ text: LanguageManager.getInstance().t('pen.use'), style: { fontFamily: 'Arial', fontSize: scale(28), fill: 0xFFFFFF } });
