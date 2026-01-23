@@ -11,6 +11,7 @@ export const zhTW = {
   'language.title': '語言',
   'language.en': 'English',
   'language.zh-TW': '繁體中文',
+  'language.ru': 'Русский',
   'app.title': 'Open Dots',
   'common.confirm': '確認',
   'common.cancel': '取消',

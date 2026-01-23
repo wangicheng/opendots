@@ -11,6 +11,7 @@ export const en = {
   'language.title': 'Language',
   'language.en': 'English',
   'language.zh-TW': '繁體中文',
+  'language.ru': 'Русский',
   'app.title': 'Open Dots',
   'common.confirm': 'Confirm',
   'common.cancel': 'Cancel',
