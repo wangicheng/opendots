@@ -16,7 +16,7 @@ import { SettingsUI } from './SettingsUI';
 import { type Pen } from '../data/PenData';
 import { UserProfileCard } from './modals/UserProfileCard';
 import { CURRENT_USER_ID, MockLevelService } from '../services/MockLevelService';
-import { LanguageManager } from '../i18n/LanguageManager';
+import { LanguageManager, type TranslationKey } from '../i18n/LanguageManager';
 
 export class LevelSelectionUI extends PIXI.Container {
   private levels: LevelData[];
@@ -105,7 +105,7 @@ export class LevelSelectionUI extends PIXI.Container {
   }
 
   private setupHeader(): void {
-    const t = (key: string) => LanguageManager.getInstance().t(key);
+    const t = (key: TranslationKey) => LanguageManager.getInstance().t(key);
     const canvasWidth = getCanvasWidth();
     const headerHeight = this.getHeaderHeight();
 

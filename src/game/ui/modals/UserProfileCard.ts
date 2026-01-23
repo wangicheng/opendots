@@ -4,7 +4,7 @@ import { getCanvasWidth, getCanvasHeight, scale } from '../../config';
 import type { LevelData } from '../../levels/LevelSchema';
 import { CURRENT_USER_ID, MockLevelService } from '../../services/MockLevelService';
 import { ConfirmDialog } from './ConfirmDialog';
-import { LanguageManager } from '../../i18n/LanguageManager';
+import { LanguageManager, type TranslationKey } from '../../i18n/LanguageManager';
 
 export class UserProfileCard extends PIXI.Container {
   private onCloseCallback: () => void;
@@ -142,7 +142,7 @@ export class UserProfileCard extends PIXI.Container {
     const textStats = new PIXI.Container();
     infoContainer.addChild(textStats);
 
-    const t = (key: string) => LanguageManager.getInstance().t(key);
+    const t = (key: TranslationKey) => LanguageManager.getInstance().t(key);
     const statLabelStyle = new PIXI.TextStyle({
       fontFamily: 'Arial', fontSize: scale(14), fill: '#888888'
     });
@@ -469,8 +469,8 @@ export class UserProfileCard extends PIXI.Container {
             dialog.destroy();
           },
           {
-            confirmText: LanguageManager.getInstance().t('level.delete'),
-            cancelText: LanguageManager.getInstance().t('common.cancel')
+            confirmKey: 'level.delete',
+            cancelKey: 'common.cancel'
           }
         );
         this.addChild(dialog);

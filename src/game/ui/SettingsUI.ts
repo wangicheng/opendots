@@ -3,7 +3,21 @@ import * as PIXI from 'pixi.js';
 import { getCanvasWidth, getCanvasHeight, scale } from '../config';
 import { MockLevelService } from '../services/MockLevelService';
 
-import { LanguageManager } from '../i18n/LanguageManager';
+import { LanguageManager, type TranslationKey } from '../i18n/LanguageManager';
+
+// Constants
+const MAX_NAME_LENGTH = 16;
+const MAX_AVATAR_SIZE = 256;
+const MAX_AVATAR_BYTES = 10240;
+
+// Type for list item with named children
+interface ListItemResult {
+  container: PIXI.Container;
+  bg: PIXI.Graphics;
+  icon: PIXI.Text;
+  label: PIXI.Text;
+  chevron: PIXI.Text;
+}
 
 type SettingsView = 'list' | 'profile' | 'language';
 
@@ -51,6 +65,8 @@ export class SettingsUI extends PIXI.Container {
     this.overlay.fill({ color: 0x000000, alpha: 0.5 });
     this.overlay.eventMode = 'static';
     this.overlay.cursor = 'default';
+    // Fix memory leak: remove old listener before adding new one
+    this.overlay.off('pointertap', this.onClose);
     this.overlay.on('pointertap', this.onClose); // Tap outside to close
 
     // 2. Card
@@ -92,7 +108,7 @@ export class SettingsUI extends PIXI.Container {
   }
 
   private drawListView(width: number): void {
-    const t = (key: string) => LanguageManager.getInstance().t(key);
+    const t = (key: TranslationKey) => LanguageManager.getInstance().t(key);
 
     // Header
     const headerParams = { title: t('settings.title'), showBack: false };
@@ -113,14 +129,14 @@ export class SettingsUI extends PIXI.Container {
 
     items.forEach((item, index) => {
       const y = startY + (index * (itemHeight + scale(10)));
-      const btn = this.createListItem(item.label, item.icon, bgWidth, itemHeight, item.onClick);
-      btn.position.set(itemX, y);
-      this.card.addChild(btn);
+      const listItem = this.createListItem(item.label, item.icon, bgWidth, itemHeight, item.onClick);
+      listItem.container.position.set(itemX, y);
+      this.card.addChild(listItem.container);
     });
   }
 
   private drawProfileView(width: number): void {
-    const t = (key: string) => LanguageManager.getInstance().t(key);
+    const t = (key: TranslationKey) => LanguageManager.getInstance().t(key);
     // Header
     this.drawHeader(width, { title: t('profile.title'), showBack: true, onBack: () => this.setView('list') });
 
@@ -137,35 +153,39 @@ export class SettingsUI extends PIXI.Container {
 
     if (profile.avatarUrl) {
       // Image Avatar
-      PIXI.Assets.load(profile.avatarUrl).then((texture) => {
-        if (!this.card.parent) return; // Component destroyed
+      PIXI.Assets.load(profile.avatarUrl)
+        .then((texture) => {
+          if (!this.card.parent) return; // Component destroyed
 
-        const sprite = new PIXI.Sprite(texture);
-        const aspect = sprite.width / sprite.height;
-        // Cover fit logic
-        if (aspect > 1) {
-          sprite.height = avatarRadius * 2;
-          sprite.width = sprite.height * aspect;
-        } else {
-          sprite.width = avatarRadius * 2;
-          sprite.height = sprite.width / aspect;
-        }
-        sprite.anchor.set(0.5);
+          const sprite = new PIXI.Sprite(texture);
+          const aspect = sprite.width / sprite.height;
+          // Cover fit logic
+          if (aspect > 1) {
+            sprite.height = avatarRadius * 2;
+            sprite.width = sprite.height * aspect;
+          } else {
+            sprite.width = avatarRadius * 2;
+            sprite.height = sprite.width / aspect;
+          }
+          sprite.anchor.set(0.5);
 
-        // Circular Mask
-        const mask = new PIXI.Graphics();
-        mask.circle(0, 0, avatarRadius);
-        mask.fill(0xFFFFFF);
-        sprite.mask = mask;
-        avatarContainer.addChild(mask);
-        avatarContainer.addChild(sprite);
+          // Circular Mask
+          const mask = new PIXI.Graphics();
+          mask.circle(0, 0, avatarRadius);
+          mask.fill(0xFFFFFF);
+          sprite.mask = mask;
+          avatarContainer.addChild(mask);
+          avatarContainer.addChild(sprite);
 
-        // Border
-        const border = new PIXI.Graphics();
-        border.circle(0, 0, avatarRadius);
-        border.stroke({ width: scale(4), color: 0xE0E0E0 });
-        avatarContainer.addChild(border);
-      });
+          // Border
+          const border = new PIXI.Graphics();
+          border.circle(0, 0, avatarRadius);
+          border.stroke({ width: scale(4), color: 0xE0E0E0 });
+          avatarContainer.addChild(border);
+        })
+        .catch((err) => {
+          console.error('Failed to load avatar image:', err);
+        });
 
       // Placeholder/Background (White)
       const placeholder = new PIXI.Graphics();
@@ -233,7 +253,6 @@ export class SettingsUI extends PIXI.Container {
     inputBg.eventMode = 'static';
     inputBg.cursor = 'text';
     inputBg.on('pointertap', () => {
-      const MAX_NAME_LENGTH = 16;
       let result = window.prompt(t('profile.prompt'), profile.name);
       if (result !== null) {
         let trimmed = result.trim();
@@ -278,7 +297,7 @@ export class SettingsUI extends PIXI.Container {
   }
 
   private drawLanguageView(width: number): void {
-    const t = (key: string) => LanguageManager.getInstance().t(key);
+    const t = (key: TranslationKey) => LanguageManager.getInstance().t(key);
 
     // Header
     this.drawHeader(width, { title: t('language.title'), showBack: true, onBack: () => this.setView('list') });
@@ -302,32 +321,27 @@ export class SettingsUI extends PIXI.Container {
       const isSelected = lang.code === currentLang;
       const icon = isSelected ? '\uF26E' : ''; // check-lg or empty
 
-      const btn = this.createListItem(lang.label, icon, bgWidth, itemHeight, () => {
+      const item = this.createListItem(lang.label, icon, bgWidth, itemHeight, () => {
         LanguageManager.getInstance().setLanguage(lang.code);
       });
-      btn.position.set(itemX, y);
+      item.container.position.set(itemX, y);
 
       // Highlight selected
       if (isSelected) {
-        // Modify the bg created in createListItem
-        const bg = btn.getChildAt(0) as PIXI.Graphics;
-        bg.clear();
-        bg.roundRect(0, 0, bgWidth, itemHeight, itemHeight / 2);
-        bg.stroke({ width: 2, color: 0x37A4E9 });
-        bg.fill(0xF0F8FF);
+        // Modify the bg using named reference
+        item.bg.clear();
+        item.bg.roundRect(0, 0, bgWidth, itemHeight, itemHeight / 2);
+        item.bg.stroke({ width: 2, color: 0x37A4E9 });
+        item.bg.fill(0xF0F8FF);
 
-        // Modify icon color
-        const iconTxt = btn.getChildAt(1) as PIXI.Text;
-        iconTxt.style.fill = '#37A4E9';
+        // Modify icon color using named reference
+        item.icon.style.fill = '#37A4E9';
       }
 
-      // Remove chevron created by default in createListItem
-      if (btn.children.length > 3) {
-        const chevron = btn.getChildAt(3); // Based on createListItem implementation
-        chevron.visible = false;
-      }
+      // Remove chevron using named reference
+      item.chevron.visible = false;
 
-      this.card.addChild(btn);
+      this.card.addChild(item.container);
     });
   }
 
@@ -410,7 +424,7 @@ export class SettingsUI extends PIXI.Container {
     this.card.addChild(divider);
   }
 
-  private createListItem(label: string, iconChar: string, w: number, h: number, onClick: () => void): PIXI.Container {
+  private createListItem(label: string, iconChar: string, w: number, h: number, onClick: () => void): ListItemResult {
     const container = new PIXI.Container();
 
     const bg = new PIXI.Graphics();
@@ -446,7 +460,7 @@ export class SettingsUI extends PIXI.Container {
     container.addChild(text);
 
     // Chevron Right
-    const arrow = new PIXI.Text({
+    const chevron = new PIXI.Text({
       text: '\uF285', // chevron-right
       style: {
         fontFamily: 'bootstrap-icons',
@@ -455,15 +469,15 @@ export class SettingsUI extends PIXI.Container {
         padding: scale(5)
       }
     });
-    arrow.anchor.set(0.5);
-    arrow.position.set(w - scale(20), h / 2 + scale(2));
-    container.addChild(arrow);
+    chevron.anchor.set(0.5);
+    chevron.position.set(w - scale(20), h / 2 + scale(2));
+    container.addChild(chevron);
 
     container.eventMode = 'static';
     container.cursor = 'pointer';
     container.on('pointertap', onClick);
 
-    return container;
+    return { container, bg, icon, label: text, chevron };
   }
 
   private setView(view: SettingsView): void {
@@ -494,19 +508,21 @@ export class SettingsUI extends PIXI.Container {
           if (result) {
             // Process Image: Resize and Compress
             const img = new Image();
+            img.onerror = () => {
+              console.error('Failed to load uploaded image');
+            };
             img.onload = () => {
-              const MAX_SIZE = 256;
               let w = img.width;
               let h = img.height;
 
               // Resize logic
-              if (w > MAX_SIZE || h > MAX_SIZE) {
+              if (w > MAX_AVATAR_SIZE || h > MAX_AVATAR_SIZE) {
                 if (w > h) {
-                  h = Math.round(h * (MAX_SIZE / w));
-                  w = MAX_SIZE;
+                  h = Math.round(h * (MAX_AVATAR_SIZE / w));
+                  w = MAX_AVATAR_SIZE;
                 } else {
-                  w = Math.round(w * (MAX_SIZE / h));
-                  h = MAX_SIZE;
+                  w = Math.round(w * (MAX_AVATAR_SIZE / h));
+                  h = MAX_AVATAR_SIZE;
                 }
               }
 
@@ -517,8 +533,7 @@ export class SettingsUI extends PIXI.Container {
               if (ctx) {
                 ctx.drawImage(img, 0, 0, w, h);
 
-                // Compress to JPEG < 10KB using binary search (3 iterations)
-                const MAX_BYTES = 10240;
+                // Compress to JPEG using binary search (3 iterations)
                 let minQ = 0.0;
                 let maxQ = 1.0;
                 let bestUrl = canvas.toDataURL('image/jpeg', 0.1); // Fallback
@@ -526,9 +541,11 @@ export class SettingsUI extends PIXI.Container {
                 for (let i = 0; i < 3; i++) {
                   const midQ = (minQ + maxQ) / 2;
                   const url = canvas.toDataURL('image/jpeg', midQ);
-                  const bytes = (url.length - 23) * 0.75; // Approx binary size
+                  // More accurate byte calculation
+                  const base64Data = url.split(',')[1] || '';
+                  const bytes = base64Data.length * 0.75;
 
-                  if (bytes <= MAX_BYTES) {
+                  if (bytes <= MAX_AVATAR_BYTES) {
                     bestUrl = url;
                     minQ = midQ;
                   } else {

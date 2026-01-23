@@ -48,7 +48,7 @@ import {
   CONVEYOR_BELT_HEIGHT,
 } from './config';
 import { EffectManager } from './effects/EffectManager';
-import { LanguageManager } from './i18n/LanguageManager';
+import { LanguageManager, type TranslationKey } from './i18n/LanguageManager';
 
 export const GameState = {
   READY: 0,
@@ -698,7 +698,7 @@ export class Game {
           LanguageManager.getInstance().t('publish.confirm_clear'),
           () => this.closeConfirmDialog(),
           () => this.closeConfirmDialog(),
-          { showCancel: false, confirmText: LanguageManager.getInstance().t('common.ok') }
+          { showCancel: false, confirmKey: 'common.ok' }
         );
         return;
       }
@@ -722,7 +722,7 @@ export class Game {
               this.closeConfirmDialog();
               this.showLevelSelection();
             },
-            { showCancel: false, confirmText: LanguageManager.getInstance().t('common.ok') }
+            { showCancel: false, confirmKey: 'common.ok' }
           );
         },
         () => this.closeConfirmDialog()
@@ -1434,7 +1434,7 @@ export class Game {
     message: string,
     onConfirm: () => void,
     onCancel: () => void,
-    options?: { confirmText?: string; cancelText?: string; showCancel?: boolean; onDismiss?: () => void }
+    options?: { confirmText?: string; cancelText?: string; confirmKey?: TranslationKey; cancelKey?: TranslationKey; showCancel?: boolean; onDismiss?: () => void }
   ): void {
     this.closeConfirmDialog();
     this.confirmDialog = new ConfirmDialog(message, onConfirm, onCancel, options);

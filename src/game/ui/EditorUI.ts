@@ -4,7 +4,7 @@ import {
   getCanvasHeight,
   scale,
 } from '../config';
-import { LanguageManager } from '../i18n/LanguageManager';
+import { LanguageManager, type TranslationKey } from '../i18n/LanguageManager';
 
 // Local visual constants matches object definitions
 const LASER_COLOR = 0x00FF00; // Green for laser
@@ -208,11 +208,13 @@ export class EditorUI extends PIXI.Container {
       fontWeight: 'bold' as PIXI.TextStyleFontWeight
     };
 
-    const editText = new PIXI.Text(LanguageManager.getInstance().t('editor.edit'), editStyle);
+    const t = (key: TranslationKey) => LanguageManager.getInstance().t(key);
+
+    const editText = new PIXI.Text(t('editor.edit'), editStyle);
     editText.anchor.set(0.5);
     editText.position.set(-w / 4, 0);
 
-    const playText = new PIXI.Text(LanguageManager.getInstance().t('editor.play'), playStyle);
+    const playText = new PIXI.Text(t('editor.play'), playStyle);
     playText.anchor.set(0.5);
     playText.position.set(w / 4, 0);
 

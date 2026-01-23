@@ -3,7 +3,6 @@ export const zhTW = {
   'settings.title': '設定',
   'settings.profile': '個人檔案',
   'settings.language': '語言',
-  'settings.close': '關閉',
   'settings.github': 'GitHub',
   'profile.title': '編輯檔案',
   'profile.name': '名稱',

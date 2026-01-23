@@ -3,7 +3,6 @@ export const ru = {
   'settings.title': 'Настройки',
   'settings.profile': 'Профиль',
   'settings.language': 'Язык',
-  'settings.close': 'Закрыть',
   'settings.github': 'GitHub',
   'profile.title': 'Ред. профиль',
   'profile.name': 'Имя',

@@ -3,7 +3,7 @@ import * as PIXI from 'pixi.js';
 import { getCanvasWidth, getCanvasHeight, scale } from '../config';
 import { PENS } from '../data/PenData';
 import type { Pen } from '../data/PenData';
-import { LanguageManager } from '../i18n/LanguageManager';
+import { LanguageManager, type TranslationKey } from '../i18n/LanguageManager';
 
 export class PenSelectionUI extends PIXI.Container {
   private overlay!: PIXI.Graphics;
@@ -216,7 +216,7 @@ export class PenSelectionUI extends PIXI.Container {
     gfx.angle = 30;
 
     // Label
-    const penName = LanguageManager.getInstance().t(`pen.names.${pen.id}`);
+    const penName = LanguageManager.getInstance().t(`pen.names.${pen.id}` as TranslationKey);
     const text = new PIXI.Text({ text: penName, style: { fontFamily: 'Arial', fontSize: scale(20), fill: 0x333333 } });
     text.anchor.set(0.5);
     text.y = scale(130);

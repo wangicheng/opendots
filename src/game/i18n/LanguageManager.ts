@@ -1,4 +1,6 @@
+import { en } from './locales/en';
 
+export type TranslationKey = keyof typeof en;
 type LocaleData = Record<string, string>;
 
 export class LanguageManager {
@@ -34,7 +36,7 @@ export class LanguageManager {
     return this.currentLang;
   }
 
-  public t(key: string): string {
+  public t(key: TranslationKey): string {
     const locale = this.locales[this.currentLang];
     if (locale && locale[key]) {
       return locale[key];

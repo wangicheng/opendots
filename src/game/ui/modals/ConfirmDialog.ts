@@ -1,6 +1,6 @@
 import * as PIXI from 'pixi.js';
 import { getCanvasWidth, getCanvasHeight, scale } from '../../config';
-import { LanguageManager } from '../../i18n/LanguageManager';
+import { LanguageManager, type TranslationKey } from '../../i18n/LanguageManager';
 
 export class ConfirmDialog extends PIXI.Container {
   private message: string;
@@ -9,6 +9,8 @@ export class ConfirmDialog extends PIXI.Container {
   private options: {
     confirmText?: string;
     cancelText?: string;
+    confirmKey?: TranslationKey;
+    cancelKey?: TranslationKey;
     showCancel?: boolean;
     onDismiss?: () => void;
   };
@@ -20,6 +22,8 @@ export class ConfirmDialog extends PIXI.Container {
     options?: {
       confirmText?: string;
       cancelText?: string;
+      confirmKey?: TranslationKey;
+      cancelKey?: TranslationKey;
       showCancel?: boolean;
       onDismiss?: () => void;
     }
@@ -43,8 +47,10 @@ export class ConfirmDialog extends PIXI.Container {
   private refreshUI(): void {
     this.removeChildren();
 
-    const confirmText = this.options.confirmText || LanguageManager.getInstance().t('common.confirm');
-    const cancelText = this.options.cancelText || LanguageManager.getInstance().t('common.cancel');
+    const confirmText = this.options.confirmText ||
+      (this.options.confirmKey ? LanguageManager.getInstance().t(this.options.confirmKey) : LanguageManager.getInstance().t('common.confirm'));
+    const cancelText = this.options.cancelText ||
+      (this.options.cancelKey ? LanguageManager.getInstance().t(this.options.cancelKey) : LanguageManager.getInstance().t('common.cancel'));
     const showCancel = this.options.showCancel !== false;
 
     const canvasWidth = getCanvasWidth();

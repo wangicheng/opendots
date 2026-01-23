@@ -3,7 +3,6 @@ export const ja = {
   'settings.title': '設定',
   'settings.profile': 'プロフィール',
   'settings.language': '言語',
-  'settings.close': '閉じる',
   'settings.github': 'GitHub',
   'profile.title': 'プロフィール編集',
   'profile.name': '名前',
