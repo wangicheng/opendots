@@ -157,7 +157,8 @@ export class UserProfileCard extends PIXI.Container {
     });
 
     // Row 1: Date
-    const dateLabel = new PIXI.Text({ text: 'Published: ', style: statLabelStyle });
+    const labelText = this.levelData.isPublished ? 'Published: ' : 'Created: ';
+    const dateLabel = new PIXI.Text({ text: labelText, style: statLabelStyle });
     const dateValue = new PIXI.Text({ text: dateStr, style: statValueStyle });
     dateValue.x = dateLabel.width;
 
