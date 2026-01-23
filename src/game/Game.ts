@@ -827,7 +827,7 @@ export class Game {
    * Process collision events from Rapier
    */
   private processCollisions(): void {
-    if (this.gameState !== GameState.PLAYING) return;
+    if (this.gameState !== GameState.PLAYING && this.gameState !== GameState.READY) return;
 
     const eventQueue = this.physicsWorld.getEventQueue();
 
@@ -837,7 +837,7 @@ export class Game {
         const ball2 = this.ballColliderHandles.get(handle2);
 
         // Check if both colliders are balls (blue and pink)
-        if (ball1 && ball2) {
+        if (ball1 && ball2 && this.gameState === GameState.PLAYING) {
           // Get positions for effect
           const pos1 = ball1.body.translation();
           const pos2 = ball2.body.translation();
@@ -854,10 +854,10 @@ export class Game {
         const iceBlock2 = this.iceBlockColliderHandles.get(handle2);
 
         // If one of the colliders is an ice block, start melting it
-        if (iceBlock1 && !iceBlock1.getIsMelting()) {
+        if (iceBlock1 && !iceBlock1.getIsMelting() && this.gameState === GameState.PLAYING) {
           iceBlock1.startMelting();
         }
-        if (iceBlock2 && !iceBlock2.getIsMelting()) {
+        if (iceBlock2 && !iceBlock2.getIsMelting() && this.gameState === GameState.PLAYING) {
           iceBlock2.startMelting();
         }
 
@@ -866,7 +866,7 @@ export class Game {
         const laser2 = this.laserColliderHandles.get(handle2);
         const ballHitByLaser = (laser1 && ball2) || (laser2 && ball1);
 
-        if (ballHitByLaser) {
+        if (ballHitByLaser && this.gameState === GameState.PLAYING) {
           const hitBall = ball1 || ball2;
           if (hitBall) {
             this.handleLoss(hitBall);
@@ -878,7 +878,7 @@ export class Game {
         const button2 = this.buttonColliderHandles.get(handle2);
         const ballHitButton = (button1 && ball2) || (button2 && ball1);
 
-        if (ballHitButton) {
+        if (ballHitButton && this.gameState === GameState.PLAYING) {
           this.triggerButtonPress();
         }
       }
@@ -1173,7 +1173,7 @@ export class Game {
    * Fixed update loop for physics
    */
   private fixedUpdate(dt: number): void {
-    if (this.gameState !== GameState.PLAYING) return;
+    if (this.gameState !== GameState.PLAYING && this.gameState !== GameState.READY) return;
 
     // Apply seesaw spring forces BEFORE physics step
     for (const seesaw of this.seesaws) {

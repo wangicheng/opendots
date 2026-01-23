@@ -54,12 +54,13 @@ export class Seesaw {
     // 2. Dynamic pivot body (can move slightly, no gravity, very high mass)
     const pivotBodyDesc = R.RigidBodyDesc.dynamic()
       .setTranslation(physicsPos.x, physicsPos.y)
-      .setGravityScale(0);  // No gravity - damping controlled by spring joint
+      .setGravityScale(0)  // No gravity - damping controlled by spring joint
+      .setCanSleep(false); // Prevent sleeping so it doesn't stop automatically
     this.pivotBody = world.createRigidBody(pivotBodyDesc);
 
     // Give pivot very high mass so it strongly resists movement
     const pivotColliderDesc = R.ColliderDesc.ball(0.01)
-      .setDensity(10000.0)  // Extremely high density = high mass
+      .setDensity(1000000.0)  // Extremely high density = high mass
       .setCollisionGroups(0);
     world.createCollider(pivotColliderDesc, this.pivotBody);
 
@@ -77,7 +78,8 @@ export class Seesaw {
     const plankBodyDesc = R.RigidBodyDesc.dynamic()
       .setTranslation(physicsPos.x, physicsPos.y)
       .setRotation(-angleRad)
-      .setAngularDamping(SEESAW_ANGULAR_DAMPING);
+      .setAngularDamping(SEESAW_ANGULAR_DAMPING)
+      .setCanSleep(false); // Prevent sleeping so continuous slow rotation works
     this.plankBody = world.createRigidBody(plankBodyDesc);
 
     // Create collider for the plank
@@ -102,22 +104,11 @@ export class Seesaw {
 
   /**
    * Apply extra damping for small oscillations to help convergence
+   * Deprecated: Now handled by physics engine linear damping and joint damping
    */
   applyForces(): void {
-    const vel = this.pivotBody.linvel();
-    const speed = Math.sqrt(vel.x * vel.x + vel.y * vel.y);
-
-    // Apply extra "static friction" style damping when speed is low
-    // This helps small oscillations die out faster
-    const lowSpeedThreshold = 10;
-    if (speed > 0.001 && speed < lowSpeedThreshold) {
-      // Stronger damping factor for low speeds (inversely proportional to speed)
-      const extraDampingFactor = 30.0 * (1 - speed / lowSpeedThreshold);
-      const dampingForceX = -extraDampingFactor * vel.x;
-      const dampingForceY = -extraDampingFactor * vel.y;
-
-      this.pivotBody.addForce({ x: dampingForceX, y: dampingForceY }, true);
-    }
+    // Logic removed to prevent conflict with physics solver at high speeds.
+    // Damping is now handled by SEESAW_PIVOT_DAMPING and rigid body linear damping.
   }
 
   getColliderHandle(): number {

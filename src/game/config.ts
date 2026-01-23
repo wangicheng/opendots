@@ -123,12 +123,12 @@ export const ICE_BLOCK_ALPHA = 0.5;
 // Seesaw settings
 export const SEESAW_COLOR = 0xC8C8C8;
 export const SEESAW_PIVOT_COLOR = 0x959595;
-export const SEESAW_DENSITY = 0.5;
+export const SEESAW_DENSITY = 2;
 export const SEESAW_FRICTION = 0.5;
 export const SEESAW_RESTITUTION = 0.0;
 export const SEESAW_ANGULAR_DAMPING = 0.0;
-export const SEESAW_PIVOT_STIFFNESS = 1e4;  // Spring stiffness for soft pivot (higher = stiffer)
-export const SEESAW_PIVOT_DAMPING = 1e-2;     // Spring damping (higher = less oscillation)
+export const SEESAW_PIVOT_STIFFNESS = 5e5;  // Spring stiffness for soft pivot (higher = stiffer)
+export const SEESAW_PIVOT_DAMPING = 0.5;       // Spring damping (higher = less oscillation)
 
 // Conveyor Belt settings
 export const CONVEYOR_BELT_COLOR = 0xA9A9A9;
