@@ -314,20 +314,74 @@ export class PropertyInspector extends PIXI.Container {
     }
   }
 
-  public setGlassMode(enabled: boolean) {
-    const alpha = enabled ? 0.1 : 1.0;
-    // Background original alpha is 0.8
-    this.bg.alpha = enabled ? 0.1 : 0.8;
-    this.title.alpha = alpha;
-    this.paramListContainer.alpha = alpha;
+  private fadeTicker: ((ticker: PIXI.Ticker) => void) | null = null;
+  private targetGlassMode: boolean = false;
 
-    // Adjuster: Only fade if NOT dragging
-    const activeControl = this.activeControl;
-    let adjusterAlpha = alpha;
-    if (activeControl && activeControl.IsDragging) {
-      adjusterAlpha = 1.0;
+  public setGlassMode(enabled: boolean) {
+    this.targetGlassMode = enabled;
+    if (!this.fadeTicker) {
+      this.fadeTicker = (ticker) => this.updateFade(ticker);
+      PIXI.Ticker.shared.add(this.fadeTicker);
     }
-    this.adjusterContainer.alpha = adjusterAlpha;
+  }
+
+  private updateFade(ticker: PIXI.Ticker) {
+    const dt = ticker.deltaTime;
+    const lerpSpeed = 0.1 * dt;
+    const epsilon = 0.01;
+    let allDone = true;
+
+    // Background
+    const bgTarget = this.targetGlassMode ? 0.1 : 0.8;
+    if (Math.abs(this.bg.alpha - bgTarget) > epsilon) {
+      this.bg.alpha += (bgTarget - this.bg.alpha) * lerpSpeed;
+      allDone = false;
+    } else {
+      this.bg.alpha = bgTarget;
+    }
+
+    // Title & Params
+    const contentTarget = this.targetGlassMode ? 0.1 : 1.0;
+
+    if (Math.abs(this.title.alpha - contentTarget) > epsilon) {
+      this.title.alpha += (contentTarget - this.title.alpha) * lerpSpeed;
+      allDone = false;
+    } else {
+      this.title.alpha = contentTarget;
+    }
+
+    if (Math.abs(this.paramListContainer.alpha - contentTarget) > epsilon) {
+      this.paramListContainer.alpha += (contentTarget - this.paramListContainer.alpha) * lerpSpeed;
+      allDone = false;
+    } else {
+      this.paramListContainer.alpha = contentTarget;
+    }
+
+    // Adjuster
+    let adjusterTarget = contentTarget;
+    if (this.activeControl && this.activeControl.IsDragging) {
+      adjusterTarget = 1.0;
+    }
+
+    if (Math.abs(this.adjusterContainer.alpha - adjusterTarget) > epsilon) {
+      this.adjusterContainer.alpha += (adjusterTarget - this.adjusterContainer.alpha) * lerpSpeed;
+      allDone = false;
+    } else {
+      this.adjusterContainer.alpha = adjusterTarget;
+    }
+
+    if (allDone) {
+      PIXI.Ticker.shared.remove(this.fadeTicker!);
+      this.fadeTicker = null;
+    }
+  }
+
+  public destroy(options?: any) {
+    if (this.fadeTicker) {
+      PIXI.Ticker.shared.remove(this.fadeTicker);
+      this.fadeTicker = null;
+    }
+    super.destroy(options);
   }
 }
 

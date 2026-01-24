@@ -322,13 +322,32 @@ export class EditorUI extends PIXI.Container {
     }
   }
 
+  private fadeTicker: ((ticker: PIXI.Ticker) => void) | null = null;
+  private targetGlassMode: boolean = false;
+
   public setGlassMode(enabled: boolean): void {
-    const targetAlpha = enabled ? 0.1 : 1.0;
+    this.targetGlassMode = enabled;
 
-    // Instead of setting this.alpha, set alpha of specific containers
-    // this.alpha = targetAlpha;
+    // Start Ticker if not running
+    if (!this.fadeTicker) {
+      this.fadeTicker = this.updateFade.bind(this);
+      PIXI.Ticker.shared.add(this.fadeTicker);
+    }
 
-    const containersToFade = [
+    if (this.propertyInspector) {
+      this.propertyInspector.setGlassMode(enabled);
+    }
+  }
+
+  private updateFade(ticker: PIXI.Ticker): void {
+    const dt = ticker.deltaTime;
+    const lerpSpeed = 0.1 * dt;
+    const targetAlpha = this.targetGlassMode ? 0.1 : 1.0;
+    const epsilon = 0.01;
+
+    let allDone = true;
+
+    const containers = [
       this.backBtn,
       this.toggleContainer,
       this.toolsContainer,
@@ -341,12 +360,20 @@ export class EditorUI extends PIXI.Container {
       this.playPenBtn
     ];
 
-    containersToFade.forEach(c => {
-      if (c) c.alpha = targetAlpha;
-    });
+    for (const c of containers) {
+      if (!c) continue;
+      const diff = targetAlpha - c.alpha;
+      if (Math.abs(diff) > epsilon) {
+        c.alpha += diff * lerpSpeed;
+        allDone = false;
+      } else {
+        c.alpha = targetAlpha;
+      }
+    }
 
-    if (this.propertyInspector) {
-      this.propertyInspector.setGlassMode(enabled);
+    if (allDone) {
+      PIXI.Ticker.shared.remove(this.fadeTicker!);
+      this.fadeTicker = null;
     }
   }
 
@@ -379,6 +406,11 @@ export class EditorUI extends PIXI.Container {
       this.currentSelection = null;
       if (this.objectSelector) {
         this.objectSelector.setSelection(null);
+      }
+      if (this.propertyInspector) {
+        this.removeChild(this.propertyInspector);
+        this.propertyInspector.destroy();
+        this.propertyInspector = null;
       }
     }
 
@@ -707,6 +739,11 @@ export class EditorUI extends PIXI.Container {
   }
 
   public destroy(options?: any): void {
+    if (this.fadeTicker) {
+      PIXI.Ticker.shared.remove(this.fadeTicker);
+      this.fadeTicker = null;
+    }
+
     this.objectListBtn = null;
     this.objectSelector = null;
     this.propertyInspector = null;
