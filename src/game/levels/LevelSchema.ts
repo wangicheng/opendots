@@ -89,12 +89,11 @@ export interface ButtonConfig {
 
 export interface LevelData {
   id: string;
+  originalId?: string; // Tracks the local ID of the level before publishing
   author?: string;
   authorId?: string;
   createdAt?: number;
   likes?: number;
-  attempts?: number;
-  clears?: number;
   balls: {
     blue: BallConfig;
     pink: BallConfig;

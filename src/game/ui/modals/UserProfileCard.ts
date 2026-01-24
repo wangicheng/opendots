@@ -23,7 +23,6 @@ export class UserProfileCard extends PIXI.Container {
     getThumbnail: (width: number, height: number) => PIXI.Container,
     onClose: () => void,
     onViewLevels: (userId: string) => void,
-    // onLikeToggle?: () => void,
     onDelete?: (levelId: string) => void,
     allowDelete: boolean = false
   ) {
@@ -33,7 +32,6 @@ export class UserProfileCard extends PIXI.Container {
     this.getThumbnail = getThumbnail;
     this.onCloseCallback = onClose;
     this.onViewLevelsCallback = onViewLevels;
-    // this.onLikeToggleCallback = onLikeToggle;
     this.onDeleteCallback = onDelete;
     this.allowDelete = allowDelete;
 
@@ -198,6 +196,26 @@ export class UserProfileCard extends PIXI.Container {
     nameText.position.set(centerX, topY);
     rightCol.addChild(nameText);
 
+    // Fetch Display Name if Remote User
+    if (this.levelData.authorId !== CURRENT_USER_ID) {
+      // We assume authorId is the GitHub username for remote levels
+      const username = this.levelData.authorId;
+      fetch(`https://api.github.com/users/${username}`)
+        .then(res => {
+          if (res.ok) return res.json();
+          throw new Error('User not found');
+        })
+        .then(data => {
+          if (data.name && !nameText.destroyed) {
+            nameText.text = data.name;
+            this.levelData.author = data.name;
+          }
+        })
+        .catch(err => {
+          console.warn('Failed to fetch user display name', err);
+        });
+    }
+
     topY += nameText.height + scale(5);
 
     // User Stats (Total Levels)
@@ -210,7 +228,10 @@ export class UserProfileCard extends PIXI.Container {
     rightCol.addChild(statsText);
 
     // View Levels / Delete Button
-    const actionBtn = (this.levelData.authorId === CURRENT_USER_ID && this.allowDelete)
+    const profile = LevelService.getInstance().getUserProfile();
+    const isMine = this.levelData.authorId === CURRENT_USER_ID || (!!profile.githubUsername && this.levelData.authorId === profile.githubUsername);
+
+    const actionBtn = (isMine && this.allowDelete)
       ? this.createDeleteButton(subCardWidth - scale(40))
       : this.createViewLevelsButton(subCardWidth - scale(40));
 

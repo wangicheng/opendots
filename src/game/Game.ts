@@ -324,8 +324,8 @@ export class Game {
 
     // Show/Hide Publish and Edit Buttons
     if (this.publishBtnContainer) {
-      const isMyDraft = levelData.authorId === CURRENT_USER_ID && levelData.isPublished === false;
-      this.publishBtnContainer.visible = isMyDraft;
+      const isMyDraft = (!levelData.authorId || levelData.authorId === CURRENT_USER_ID) && levelData.isPublished === false;
+      this.publishBtnContainer.visible = !!isMyDraft;
 
       // If in Editor Play Mode, hide global buttons (EditorUI handles them)
       if (isMyDraft) {
@@ -725,17 +725,20 @@ export class Game {
             likes,
             isPublished,
             authorPassed,
-            attempts,
-            clears,
             isLikedByCurrentUser,
             id,
             createdAt,
+            author,
+            authorId,
+            publishAt,
+            updatedAt,
             ...otherData
-          } = currentLevel;
+          } = currentLevel as any;
 
           // User requested not to include ID in the issue content. 
           // The ID will be assigned by the workflow.
-          const payloadObj = { data: otherData };
+          // BUT we include originalId for tracking
+          const payloadObj = { data: { ...otherData, originalId: id } };
           const payloadStr = JSON.stringify(payloadObj);
 
           // Construct URL
@@ -1668,9 +1671,7 @@ export class Game {
   private async createNewLevel(): Promise<void> {
     // Create default level data
     const newLevel: LevelData = {
-      id: `custom_${Date.now()}`,
-      author: 'Me',
-      authorId: CURRENT_USER_ID,
+      id: `${Date.now()}`,
       createdAt: Date.now(),
       likes: 0,
       isPublished: false,

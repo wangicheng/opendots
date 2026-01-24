@@ -1,5 +1,5 @@
 import type { LevelData } from '../levels/LevelSchema';
-import level1 from '../levels/level1.json';
+
 
 // Local storage key for custom levels
 const STORAGE_KEY = 'opendots_custom_levels';
@@ -24,9 +24,6 @@ export class LevelService {
   private publishedLevelIds: Set<string> = new Set();
   private likedLevelIds: Set<string> = new Set();
   private deletedLevelIds: Set<string> = new Set();
-  private builtinLevels: LevelData[] = [
-    level1 as unknown as LevelData
-  ];
 
   private constructor() {
     this.loadLikes();
@@ -54,32 +51,13 @@ export class LevelService {
   public async getLevelList(): Promise<LevelData[]> {
     // 1. Get Local Levels (Drafts, Untested, Your works)
     // Filter out published levels from local storage, as we want to source them from GitHub
-    const localLevels = this.getStoredLevels().filter(l => !l.isPublished);
-
-    // Ensure "draft_level_01" exists if not present (and not published check handled above implicitly if new)
-    const draftId = 'draft_level_01';
-    // Check if we need to revive the draft
-    if (!localLevels.find(l => l.id === draftId)) {
-      // Only add default draft if it's not supposedly published/replaced?
-      // For now, keep the draft logic simple
-      const draftLevel: LevelData = {
-        ...this.builtinLevels[0],
-        id: draftId,
-        author: this.getUserProfile().name,
-        authorId: CURRENT_USER_ID,
-        createdAt: Date.now(),
-        attempts: 0,
-        clears: 0,
-        isPublished: false,
-        authorPassed: false
-      };
-
-      // Check if this draft ID exists in storedLevels (it might have been excluded above)
-      const stored = this.getStoredLevels();
-      if (!stored.find(l => l.id === draftId)) {
-        localLevels.unshift(draftLevel);
-      }
-    }
+    const localLevels = this.getStoredLevels()
+      .map(l => ({
+        ...l,
+        author: l.author || 'Me',
+        authorId: l.authorId || CURRENT_USER_ID,
+        isPublished: false
+      }));
 
     // 2. Fetch Remote Levels (Community)
     let remoteLevels: LevelData[] = [];
@@ -105,7 +83,7 @@ export class LevelService {
                   // We might still namespace it to be safe, or trust the ID if unique enough.
                   // Let's stick to namespacing to avoid collision with local drafts.
                   id: `${username}#${level.id}`,
-                  originalId: level.id,
+                  originalId: level.originalId || level.id,
                   author: username, // Force author name to be the GitHub username
                   authorId: username, // Force authorId to be the GitHub username
                   isPublished: true, // It is from the public DB
@@ -122,11 +100,16 @@ export class LevelService {
     }
 
 
-    // 3. Combine
-    // Local levels take precedence? Or kept separate?
-    // Current UI merges them.
-    // Filter out deleted
-    const all = [...localLevels, ...remoteLevels].filter(l => !this.deletedLevelIds.has(l.id));
+    // 3. Combine with Difference Set Logic
+    // "IsPublished" is determined by whether the level exists in the Cloud list.
+    // If a local level ID (draft) appears as an 'originalId' in the remote list, it is effectively published.
+    // We filter out the *local* copy so the user only sees the *published* (remote) one.
+
+    const remoteOriginalIds = new Set(remoteLevels.map(r => String(r.originalId)).filter(Boolean));
+    const drafts = localLevels.filter(l => !remoteOriginalIds.has(String(l.id)));
+
+    // Combine: Drafts (Local-Unique) + Published (Remote)
+    const all = [...drafts, ...remoteLevels].filter(l => !this.deletedLevelIds.has(l.id));
 
     return all;
   }
@@ -150,10 +133,16 @@ export class LevelService {
     const stored = this.getStoredLevels();
     const index = stored.findIndex(l => l.id === level.id);
 
+    // Sanitize: Don't store author info or published status locally
+    const { author, authorId, isPublished, ...levelToSave } = level;
+
+    // We can cast back to LevelData (it's valid to have these optional)
+    const sanitizedLevel = levelToSave as LevelData;
+
     if (index >= 0) {
-      stored[index] = level;
+      stored[index] = sanitizedLevel;
     } else {
-      stored.push(level);
+      stored.push(sanitizedLevel);
     }
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
@@ -166,13 +155,8 @@ export class LevelService {
     await new Promise(resolve => setTimeout(resolve, 300));
     this.publishedLevelIds.add(levelId);
 
-    // Also update storage if it exists there
-    const stored = this.getStoredLevels();
-    const index = stored.findIndex(l => l.id === levelId);
-    if (index >= 0) {
-      stored[index].isPublished = true;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
-    }
+    // We do NOT store isPublished state locally.
+    // It is ephemeral until confirmed by the cloud (GitHub).
   }
 
   private getStoredLevels(): LevelData[] {

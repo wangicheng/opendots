@@ -849,6 +849,12 @@ export class LevelSelectionUI extends PIXI.Container {
   }
 
   private setFilterAuthor(authorId: string | null, authorName?: string, authorColor?: number): void {
+    // Check if this is me (via GitHub username)
+    const profile = LevelService.getInstance().getUserProfile();
+    if (authorId && profile.githubUsername && authorId === profile.githubUsername) {
+      authorId = CURRENT_USER_ID;
+    }
+
     if (this.filterAuthorId === authorId) return;
     this.filterAuthorId = authorId;
 
@@ -904,9 +910,14 @@ export class LevelSelectionUI extends PIXI.Container {
     // We'll draw it at the end when we know the width
 
     // 2. Avatar (Left)
-    const avatar = new PIXI.Graphics();
-    avatar.circle(0, 0, avatarSize / 2);
-    avatar.fill(this.filterAuthorColor);
+    let profileUrl: string | undefined;
+    if (this.filterAuthorId === CURRENT_USER_ID) {
+      profileUrl = LevelService.getInstance().getUserProfile().avatarUrl;
+    } else if (this.filterAuthorId) {
+      profileUrl = `https://avatars.githubusercontent.com/${this.filterAuthorId}`;
+    }
+
+    const avatar = UIFactory.createAvatar(avatarSize / 2, profileUrl, this.filterAuthorColor, 0xE0E0E0);
     avatar.position.set(paddingLeft + avatarSize / 2, tagHeight / 2);
 
     // 3. Name Text
@@ -1007,7 +1018,8 @@ export class LevelSelectionUI extends PIXI.Container {
     // Default: Filter out unpublished levels (Drafts)
     // Only show drafts if we are explicitly filtering by CURRENT_USER_ID ("Mine")
     if (filterId === CURRENT_USER_ID) {
-      list = list.filter(l => l.authorId === filterId);
+      const profile = LevelService.getInstance().getUserProfile();
+      list = list.filter(l => l.authorId === filterId || (profile.githubUsername && l.authorId === profile.githubUsername));
     } else if (filterId) {
       // Filtering by another user -> Match author AND must be published
       list = list.filter(l => {
