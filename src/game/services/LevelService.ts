@@ -83,7 +83,7 @@ export class LevelService {
     // 2. Fetch Remote Levels (Community)
     let remoteLevels: LevelData[] = [];
     try {
-      const DB_URL = 'https://raw.githubusercontent.com/wangicheng/opendots/database/data.json';
+      const DB_URL = 'https://raw.githubusercontent.com/wangicheng/opendots/refs/heads/database/data.json';
       const res = await fetch(DB_URL);
       if (res.ok) {
         const db = await res.json();
