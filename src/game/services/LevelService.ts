@@ -45,7 +45,7 @@ export class LevelService {
   }
 
   /**
-   * Get all levels (Built-in + User Uploaded)
+   * Get all levels
    * Treating them all as "Community Levels"
    */
   public async getLevelList(): Promise<LevelData[]> {
@@ -56,7 +56,7 @@ export class LevelService {
         ...l,
         author: l.author || 'Me',
         authorId: l.authorId || CURRENT_USER_ID,
-        isPublished: false
+        isPublished: this.publishedLevelIds.has(l.id)
       }));
 
     // 2. Fetch Remote Levels (Community)
@@ -73,20 +73,16 @@ export class LevelService {
               user.levels.forEach((level: any) => {
                 // Validate level data integrity if needed
 
-                // Namespace ID to prevent collision and ensure ownership
-                // Format: username#original_id
+                // Namespace ID to prevent collision and ensure ownership?
+                // User Request: Use originalId as the main ID if available.
+                // Store issue ID in a separate field.
                 const namespacedLevel = {
                   ...level,
-                  // If the level has an ID from the issue (e.g. numeric), preserve it or namespace it?
-                  // The user wants the issue ID to be the level ID.
-                  // Assuming the DB stores the level with the issue ID as its ID.
-                  // We might still namespace it to be safe, or trust the ID if unique enough.
-                  // Let's stick to namespacing to avoid collision with local drafts.
-                  id: `${username}#${level.id}`,
+                  id: level.originalId || `${username}#${level.id}`,
                   originalId: level.originalId || level.id,
                   author: username, // Force author name to be the GitHub username
                   authorId: username, // Force authorId to be the GitHub username
-                  isPublished: true, // It is from the public DB
+                  isPublished: true,
                   isLikedByCurrentUser: false // Reset for generic
                 };
                 remoteLevels.push(namespacedLevel as LevelData);
@@ -104,9 +100,10 @@ export class LevelService {
     // "IsPublished" is determined by whether the level exists in the Cloud list.
     // If a local level ID (draft) appears as an 'originalId' in the remote list, it is effectively published.
     // We filter out the *local* copy so the user only sees the *published* (remote) one.
+    // Since we now use originalId (UUID) as the ID for remote levels, we can just check IDs.
 
-    const remoteOriginalIds = new Set(remoteLevels.map(r => String(r.originalId)).filter(Boolean));
-    const drafts = localLevels.filter(l => !remoteOriginalIds.has(String(l.id)));
+    const remoteIds = new Set(remoteLevels.map(r => r.id));
+    const drafts = localLevels.filter(l => !remoteIds.has(l.id));
 
     // Combine: Drafts (Local-Unique) + Published (Remote)
     const all = [...drafts, ...remoteLevels].filter(l => !this.deletedLevelIds.has(l.id));

@@ -324,7 +324,7 @@ export class Game {
 
     // Show/Hide Publish and Edit Buttons
     if (this.publishBtnContainer) {
-      const isMyDraft = (!levelData.authorId || levelData.authorId === CURRENT_USER_ID) && levelData.isPublished === false;
+      const isMyDraft = (!levelData.authorId || levelData.authorId === CURRENT_USER_ID) && !levelData.isPublished;
       this.publishBtnContainer.visible = !!isMyDraft;
 
       // If in Editor Play Mode, hide global buttons (EditorUI handles them)
@@ -723,7 +723,7 @@ export class Game {
           // Sanitize data (remove local tracking metrics and redundant fields)
           const {
             likes,
-            isPublished,
+            isPublished, // Will be filtered out by logic or explicitly here
             authorPassed,
             isLikedByCurrentUser,
             id,
@@ -1361,7 +1361,7 @@ export class Game {
     // Dynamic import to avoid circular dependencies if any
     const { LevelSelectionUI } = await import('./ui/LevelSelectionUI');
 
-    // Fetch all levels (built-in + user uploaded) from Service
+    // Fetch all levels (community + user uploaded) from Service
     const levelService = LevelService.getInstance();
     const levels = await levelService.getLevelList();
 

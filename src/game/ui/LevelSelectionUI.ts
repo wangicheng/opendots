@@ -384,7 +384,7 @@ export class LevelSelectionUI extends PIXI.Container {
     // Designer Avatar rendering moved to the end to ensure it's on top of any status overlay
 
     // 4.5 Published/Draft Status Overlay
-    if (levelData.authorId === CURRENT_USER_ID && levelData.isPublished === false) {
+    if (levelData.authorId === CURRENT_USER_ID && !levelData.isPublished) {
       // 1. Dark Mask (Always for unpublished)
       const darkOverlay = new PIXI.Graphics();
       darkOverlay.rect(0, 0, width, height);
@@ -1024,12 +1024,12 @@ export class LevelSelectionUI extends PIXI.Container {
       // Filtering by another user -> Match author AND must be published
       list = list.filter(l => {
         const isAuthor = l.authorId === filterId;
-        return isAuthor && l.isPublished !== false;
+        return isAuthor && l.isPublished;
       });
     } else {
       // Global list (Latest/Popular) -> Must be published AND NOT Local-Only User
       // "Local stored own public levels should only show in Mine"
-      list = list.filter(l => l.isPublished !== false && l.authorId !== CURRENT_USER_ID);
+      list = list.filter(l => l.isPublished && l.authorId !== CURRENT_USER_ID);
     }
 
     // 2. Sort

@@ -106,7 +106,8 @@ export interface LevelData {
   seesaws?: SeesawConfig[];
   conveyors?: ConveyorBeltConfig[];
   buttons?: ButtonConfig[];
-  isPublished?: boolean;
   authorPassed?: boolean;
+  isPublished?: boolean;
   isLikedByCurrentUser?: boolean;
+  issueId?: number;
 }
