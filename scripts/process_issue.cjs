@@ -101,9 +101,11 @@ async function run() {
 
     // Ensure User Exists
     if (!db.users[username]) {
-      db.users[username] = { avatar: null, levels: [] };
+      db.users[username] = { levels: [] };
     }
     const user = db.users[username];
+    // Remove unused avatar field
+    delete user.avatar;
 
     // Apply Changes
     switch (action) {
@@ -128,7 +130,16 @@ async function run() {
         break;
 
       case 'delete_level':
-        user.levels = user.levels.filter(l => l.id !== validatedPayload.id);
+        const initialCount = user.levels.length;
+        const targetId = String(validatedPayload.id);
+
+        user.levels = user.levels.filter(l => String(l.id) !== targetId);
+
+        if (user.levels.length === initialCount) {
+          console.warn(`WARNING: Level with ID ${targetId} not found for deletion.`);
+        } else {
+          console.log(`Deleted level ${targetId}. Count reduced from ${initialCount} to ${user.levels.length}.`);
+        }
         break;
     }
 
