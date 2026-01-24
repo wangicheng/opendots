@@ -8,25 +8,35 @@ export class LinearControl extends PIXI.Container {
   private onChange: (value: number) => void;
   private stepPerTurn: number;
   private tickCount: number;
+  private onDragStateChange?: (active: boolean) => void;
 
   private bg: PIXI.Graphics;
   private knob: PIXI.Graphics;
   private valueText: PIXI.Text;
+  private textBg: PIXI.Graphics;
 
-  private isDragging: boolean = false;
+  private _isDragging: boolean = false;
+  get IsDragging(): boolean {
+    return this._isDragging;
+  }
   private lastAngle: number = 0;
 
-  constructor(radius: number, initialValue: number, onChange: (value: number) => void, options: { stepPerTurn?: number, tickCount?: number } = {}) {
+  constructor(radius: number, initialValue: number, onChange: (value: number) => void, options: { stepPerTurn?: number, tickCount?: number, onDragStateChange?: (active: boolean) => void } = {}) {
     super();
     this.radius = scale(radius);
     this._value = initialValue;
     this.onChange = onChange;
     this.stepPerTurn = options.stepPerTurn || 100;
     this.tickCount = options.tickCount || 10;
+    this.onDragStateChange = options.onDragStateChange;
 
     // Setup Visuals
     this.bg = new PIXI.Graphics();
     this.addChild(this.bg);
+
+    // Value Label Background
+    this.textBg = new PIXI.Graphics();
+    this.addChild(this.textBg);
 
     // Value Label
     this.valueText = new PIXI.Text({
@@ -54,7 +64,7 @@ export class LinearControl extends PIXI.Container {
   }
 
   public setValue(val: number) {
-    if (this.isDragging) return; // Don't fight user input
+    if (this._isDragging) return; // Don't fight user input
     this._value = val;
     this.render();
   }
@@ -112,11 +122,25 @@ export class LinearControl extends PIXI.Container {
     // 3. Text
     this.valueText.text = valToRender.toFixed(1);
 
+    // Update Text Background
+    this.textBg.clear();
+    const width = this.valueText.width;
+    const height = this.valueText.height;
+    const pad = scale(4);
+    this.textBg.roundRect(
+      -width / 2 - pad,
+      this.radius + scale(25) - height / 2 - pad,
+      width + pad * 2,
+      height + pad * 2,
+      pad
+    );
+    this.textBg.fill({ color: 0x000000, alpha: 0.6 });
+
 
   }
 
   private onDragStart(e: PIXI.FederatedPointerEvent) {
-    this.isDragging = true;
+    this._isDragging = true;
     const local = this.toLocal(e.global);
     this.lastAngle = Math.atan2(local.y, local.x);
 
@@ -124,10 +148,11 @@ export class LinearControl extends PIXI.Container {
     this.on('globalpointermove', this.onDragMove, this);
     this.on('pointerup', this.onDragEnd, this);
     this.on('pointerupoutside', this.onDragEnd, this);
+    this.onDragStateChange?.(true);
   }
 
   private onDragMove(e: PIXI.FederatedPointerEvent) {
-    if (!this.isDragging) return;
+    if (!this._isDragging) return;
 
     const local = this.toLocal(e.global);
     const dist = Math.sqrt(local.x * local.x + local.y * local.y);
@@ -157,9 +182,10 @@ export class LinearControl extends PIXI.Container {
   }
 
   private onDragEnd() {
-    this.isDragging = false;
+    this._isDragging = false;
     this.off('globalpointermove', this.onDragMove, this);
     this.off('pointerup', this.onDragEnd, this);
     this.off('pointerupoutside', this.onDragEnd, this);
+    this.onDragStateChange?.(false);
   }
 }

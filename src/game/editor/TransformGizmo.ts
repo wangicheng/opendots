@@ -79,6 +79,8 @@ export class TransformGizmo extends PIXI.Container {
   // Callbacks
   private onTransformChange: (() => void) | null = null;
   private onTransformEnd: (() => void) | null = null;
+  private onDragStart: (() => void) | null = null;
+  private onDragEnd: (() => void) | null = null;
   private onContentClick: (() => void) | null = null;
 
   // Interaction State
@@ -113,7 +115,9 @@ export class TransformGizmo extends PIXI.Container {
     type: string,
     onTransformChange?: () => void,
     onTransformEnd?: () => void,
-    onContentClick?: () => void
+    onContentClick?: () => void,
+    onDragStart?: () => void,
+    onDragEnd?: () => void
   ): void {
     this.clearHandles();
 
@@ -123,6 +127,8 @@ export class TransformGizmo extends PIXI.Container {
     this.onTransformChange = onTransformChange || null;
     this.onTransformEnd = onTransformEnd || null;
     this.onContentClick = onContentClick || null;
+    this.onDragStart = onDragStart || null;
+    this.onDragEnd = onDragEnd || null;
 
     const constraintKey = this.getConstraintKey(type, data);
     this.constraints = CONSTRAINTS[constraintKey] || {
@@ -549,6 +555,8 @@ export class TransformGizmo extends PIXI.Container {
     doc.addEventListener('pointermove', this.onPointerMove);
     doc.addEventListener('pointerup', this.onPointerUp);
     doc.addEventListener('pointercancel', this.onPointerUp);
+
+    this.onDragStart?.();
   }
 
   private onPointerMove = (e: PointerEvent): void => {
@@ -608,6 +616,7 @@ export class TransformGizmo extends PIXI.Container {
     window.removeEventListener('pointercancel', this.onPointerUp);
 
     this.onTransformEnd?.();
+    this.onDragEnd?.();
   };
 
   // ---- Transform Operations ----
@@ -823,5 +832,7 @@ export class TransformGizmo extends PIXI.Container {
     window.addEventListener('pointermove', this.onPointerMove);
     window.addEventListener('pointerup', this.onPointerUp);
     window.addEventListener('pointercancel', this.onPointerUp);
+
+    this.onDragStart?.();
   }
 }

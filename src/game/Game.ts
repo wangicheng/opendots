@@ -1862,8 +1862,11 @@ export class Game {
         data,
         type,
         () => this.onGizmoTransformChange(),
+
         () => this.onGizmoTransformEnd(),
-        () => this.deselectObject()
+        () => this.deselectObject(),
+        () => this.editorUI?.setGlassMode(true),
+        () => this.editorUI?.setGlassMode(false)
       );
     }
 

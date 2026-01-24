@@ -23,25 +23,31 @@ export class PropertyInspector extends PIXI.Container {
   private panelHeight: number;
   private target: EditorObject;
   private onUpdate: () => void; // Call when property changes so Game can re-render
+  private onInteractionStateChange?: (active: boolean) => void;
 
   private paramListContainer: PIXI.Container;
+  private bg: PIXI.Container;
+  private title: PIXI.Text;
   private adjusterContainer: PIXI.Container;
   private activeProp: PropDef | null = null;
   private activeControl: LinearControl | DialControl | null = null;
 
   private static lastActivePropMap: Record<string, string> = {};
 
-  constructor(width: number, height: number, target: EditorObject, onUpdate: () => void) {
+  constructor(width: number, height: number, target: EditorObject, onUpdate: () => void, onInteractionStateChange?: (active: boolean) => void) {
     super();
     this.panelWidth = width;
     this.panelHeight = height;
     this.target = target;
     this.onUpdate = onUpdate;
+    this.onInteractionStateChange = onInteractionStateChange;
 
     // Background
     const bg = UIFactory.createCardBackground(width, height, 0x333333, scale(12));
     bg.alpha = 0.8;
     this.addChild(bg);
+    this.bg = bg;
+
 
     // Title
     const title = new PIXI.Text({
@@ -54,7 +60,10 @@ export class PropertyInspector extends PIXI.Container {
       }
     });
     title.position.set(scale(20), scale(15));
+    title.position.set(scale(20), scale(15));
     this.addChild(title);
+    this.title = title;
+
 
     // Layout
     this.paramListContainer = new PIXI.Container();
@@ -239,13 +248,16 @@ export class PropertyInspector extends PIXI.Container {
       if (this.activeProp.controlType === 'linear') {
         const linear = new LinearControl(50, val, onChange, {
           stepPerTurn: this.activeProp.step,
-          tickCount: this.activeProp.tickCount
+          tickCount: this.activeProp.tickCount,
+          onDragStateChange: this.onInteractionStateChange
         });
         this.adjusterContainer.addChild(linear);
         this.activeControl = linear;
       } else {
         // Default to Dial
-        const dial = new DialControl(50, val, onChange);
+        const dial = new DialControl(50, val, onChange, {
+          onDragStateChange: this.onInteractionStateChange
+        });
         this.adjusterContainer.addChild(dial);
         this.activeControl = dial;
       }
@@ -301,4 +313,21 @@ export class PropertyInspector extends PIXI.Container {
       this.renderAdjuster();
     }
   }
+
+  public setGlassMode(enabled: boolean) {
+    const alpha = enabled ? 0.1 : 1.0;
+    // Background original alpha is 0.8
+    this.bg.alpha = enabled ? 0.1 : 0.8;
+    this.title.alpha = alpha;
+    this.paramListContainer.alpha = alpha;
+
+    // Adjuster: Only fade if NOT dragging
+    const activeControl = this.activeControl;
+    let adjusterAlpha = alpha;
+    if (activeControl && activeControl.IsDragging) {
+      adjusterAlpha = 1.0;
+    }
+    this.adjusterContainer.alpha = adjusterAlpha;
+  }
 }
+

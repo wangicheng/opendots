@@ -5,23 +5,30 @@ import { scale } from '../../config';
 export class DialControl extends PIXI.Container {
   private radius: number;
   private onChange: (value: number) => void;
+  private onDragStateChange?: (active: boolean) => void;
 
   private bg: PIXI.Graphics;
   private knob: PIXI.Graphics;
   private exponentText: PIXI.Text;
   private valueText: PIXI.Text;
+  private textBg: PIXI.Graphics;
 
-  private isDragging: boolean = false;
+  private _isDragging: boolean = false;
+
+  get IsDragging(): boolean {
+    return this._isDragging;
+  }
   private lastAngle: number = 0;
 
   // Scientific notation parts
   private mantissa: number = 1; // [1, 10)
   private exponent: number = 0; // Integer
 
-  constructor(radius: number, initialValue: number, onChange: (value: number) => void) {
+  constructor(radius: number, initialValue: number, onChange: (value: number) => void, options?: { onDragStateChange?: (active: boolean) => void }) {
     super();
     this.radius = scale(radius);
     this.onChange = onChange;
+    this.onDragStateChange = options?.onDragStateChange;
 
     this.decomposeValue(initialValue);
 
@@ -42,6 +49,10 @@ export class DialControl extends PIXI.Container {
     });
     this.exponentText.anchor.set(0.5);
     this.addChild(this.exponentText);
+
+    // Value Label Background
+    this.textBg = new PIXI.Graphics();
+    this.addChild(this.textBg);
 
     // Value Label (Current Value)
     this.valueText = new PIXI.Text({
@@ -69,7 +80,7 @@ export class DialControl extends PIXI.Container {
   }
 
   public setValue(val: number) {
-    if (this.isDragging) return; // Don't fight user input
+    if (this._isDragging) return; // Don't fight user input
     this.decomposeValue(val);
     this.render();
   }
@@ -164,10 +175,24 @@ export class DialControl extends PIXI.Container {
     } else {
       this.valueText.text = val.toExponential(2);
     }
+
+    // Update Text Background
+    this.textBg.clear();
+    const width = this.valueText.width;
+    const height = this.valueText.height;
+    const pad = scale(4);
+    this.textBg.roundRect(
+      -width / 2 - pad,
+      this.radius + scale(25) - height / 2 - pad,
+      width + pad * 2,
+      height + pad * 2,
+      pad
+    );
+    this.textBg.fill({ color: 0x000000, alpha: 0.6 });
   }
 
   private onDragStart(e: PIXI.FederatedPointerEvent) {
-    this.isDragging = true;
+    this._isDragging = true;
     const local = this.toLocal(e.global);
     this.lastAngle = Math.atan2(local.y, local.x);
 
@@ -175,10 +200,11 @@ export class DialControl extends PIXI.Container {
     this.on('globalpointermove', this.onDragMove, this);
     this.on('pointerup', this.onDragEnd, this);
     this.on('pointerupoutside', this.onDragEnd, this);
+    this.onDragStateChange?.(true);
   }
 
   private onDragMove(e: PIXI.FederatedPointerEvent) {
-    if (!this.isDragging) return;
+    if (!this._isDragging) return;
 
     const local = this.toLocal(e.global);
     const dist = Math.sqrt(local.x * local.x + local.y * local.y);
@@ -241,9 +267,10 @@ export class DialControl extends PIXI.Container {
   }
 
   private onDragEnd() {
-    this.isDragging = false;
+    this._isDragging = false;
     this.off('globalpointermove', this.onDragMove, this);
     this.off('pointerup', this.onDragEnd, this);
     this.off('pointerupoutside', this.onDragEnd, this);
+    this.onDragStateChange?.(false);
   }
 }

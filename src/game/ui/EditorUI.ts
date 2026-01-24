@@ -322,6 +322,34 @@ export class EditorUI extends PIXI.Container {
     }
   }
 
+  public setGlassMode(enabled: boolean): void {
+    const targetAlpha = enabled ? 0.1 : 1.0;
+
+    // Instead of setting this.alpha, set alpha of specific containers
+    // this.alpha = targetAlpha;
+
+    const containersToFade = [
+      this.backBtn,
+      this.toggleContainer,
+      this.toolsContainer,
+      this.bottomBar,
+      this.tabsContainer,
+      this.itemsContainer,
+      this.objectSelector,
+      this.playHomeBtn,
+      this.playRestartBtn,
+      this.playPenBtn
+    ];
+
+    containersToFade.forEach(c => {
+      if (c) c.alpha = targetAlpha;
+    });
+
+    if (this.propertyInspector) {
+      this.propertyInspector.setGlassMode(enabled);
+    }
+  }
+
   public updateTools(hasSelection: boolean, isBall: boolean): void {
     // Save state for layout restoration
     this.lastHasSelection = hasSelection;
@@ -736,7 +764,7 @@ export class EditorUI extends PIXI.Container {
 
     this.propertyInspector = new PropertyInspector(inspectorWidth, h, obj, () => {
       this.onObjectModified(obj);
-    });
+    }, (active) => this.setGlassMode(active));
     this.propertyInspector.position.set(inspectorX, scale(100));
     this.addChild(this.propertyInspector);
   }
