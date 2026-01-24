@@ -7,10 +7,6 @@ import { UIFactory } from './UIFactory';
 import { LanguageManager, type TranslationKey } from '../i18n/LanguageManager';
 
 // Constants
-const MAX_NAME_LENGTH = 16;
-const MAX_AVATAR_SIZE = 256;
-const MAX_AVATAR_BYTES = 10240;
-
 // Type for list item with named children
 interface ListItemResult {
   container: PIXI.Container;
@@ -27,7 +23,7 @@ export class SettingsUI extends PIXI.Container {
   private currentView: SettingsView = 'list';
   private overlay: PIXI.Graphics;
   private card: PIXI.Container;
-  private fileInputElement: HTMLInputElement | null = null;
+
 
   constructor(onClose: () => void) {
     super();
@@ -146,126 +142,108 @@ export class SettingsUI extends PIXI.Container {
     avatarContainer.position.set(centerX, avatarY);
     this.card.addChild(avatarContainer);
 
-    // Avatar Interaction (Upload Image)
-    avatarContainer.eventMode = 'static';
-    avatarContainer.cursor = 'pointer';
-    avatarContainer.on('pointertap', () => {
-      this.triggerFileUpload();
-    });
+    // Name Section
+    const nameY = avatarY + avatarRadius + scale(10);
 
-    const changeText = new PIXI.Text({
-      text: t('profile.upload'),
+    // 1. Display Name (Main, Large) - Centered
+    const displayName = new PIXI.Text({
+      text: profile.name,
       style: {
         fontFamily: 'Arial',
-        fontSize: scale(12),
-        fill: '#AAAAAA'
+        fontSize: scale(24),
+        fill: '#333333',
+        fontWeight: 'bold',
+        align: 'center'
       }
     });
-    changeText.anchor.set(0.5);
-    changeText.position.set(centerX, avatarY + avatarRadius + scale(15));
-    this.card.addChild(changeText);
+    displayName.anchor.set(0.5, 0);
+    displayName.position.set(centerX, nameY);
+    this.card.addChild(displayName);
 
+    // 2. GitHub Integration Section
+    const inputY = nameY + scale(55);
+    const inputW = width - scale(80);
+    const inputH = scale(50);
+    const inputX = scale(40);
 
-    // Name Section
-    const nameY = avatarY + avatarRadius + scale(60);
-
-    const nameLabel = new PIXI.Text({
-      text: t('profile.name'),
+    // Instructions / Label
+    const instructionText = new PIXI.Text({
+      text: t('settings.github'),
       style: {
         fontFamily: 'Arial',
         fontSize: scale(14),
-        fill: '#888888',
-        fontWeight: 'bold'
+        fill: '#888888'
       }
     });
-    nameLabel.position.set(scale(40), nameY);
-    this.card.addChild(nameLabel);
+    instructionText.anchor.set(0.5, 1);
+    instructionText.position.set(centerX, inputY - scale(5));
+    this.card.addChild(instructionText);
 
-    // Name Display / Edit Box (Pill shape)
-    const inputW = width - scale(80);
-    const inputH = scale(40);
-    const inputX = scale(40);
-    const inputY = nameY + scale(25);
-
-    // used roundRect... but wait, createPill uses full radius.
-    // original: inputH / 2. Yes, it is a pill.
+    // GitHub Input Box (Pill shape)
     const inputBg = UIFactory.createPill(inputW, inputH, 0xF5F5F5, 0xDDDDDD, 1);
     inputBg.position.set(inputX, inputY);
 
     // Interaction to edit
     inputBg.eventMode = 'static';
-    inputBg.cursor = 'text';
+    inputBg.cursor = 'pointer';
     inputBg.on('pointertap', () => {
-      let result = window.prompt(t('profile.prompt'), profile.name);
+      const current = profile.githubUsername || '';
+      const result = window.prompt('Enter GitHub Username', current);
       if (result !== null) {
-        let trimmed = result.trim();
-        if (trimmed.length > 0) {
-          if (trimmed.length > MAX_NAME_LENGTH) {
-            trimmed = trimmed.substring(0, MAX_NAME_LENGTH);
-          }
-          LevelService.getInstance().updateUserProfile({ name: trimmed });
-          this.refreshUI();
-          this.emit('profileUpdate');
+        const username = result.trim();
+        if (username.length > 0 && username !== current) {
+          this.fetchGitHubProfile(username);
         }
       }
     });
     this.card.addChild(inputBg);
 
-    const nameText = new PIXI.Text({
-      text: profile.name,
+    // Text Inside Pill: GitHub Username or "Connect"
+    const pillTextValue = profile.githubUsername ? `@${profile.githubUsername}` : 'Connect GitHub Account';
+    const pillTextColor = profile.githubUsername ? '#333333' : '#888888';
+
+    const pillText = new PIXI.Text({
+      text: pillTextValue,
       style: {
         fontFamily: 'Arial',
-        fontSize: scale(18),
-        fill: '#333333'
+        fontSize: scale(16),
+        fill: pillTextColor
       }
     });
-    nameText.anchor.set(0, 0.5);
-    nameText.position.set(inputX + scale(10), inputY + inputH / 2);
-    nameText.eventMode = 'none'; // Allow clicks to pass through to background
-    this.card.addChild(nameText);
+    pillText.anchor.set(0.5);
+    pillText.position.set(inputX + inputW / 2, inputY + inputH / 2);
+    pillText.eventMode = 'none';
+    this.card.addChild(pillText);
 
+    // Edit Icon (Right side of pill)
     const editIcon = UIFactory.createIcon('\uF4CB', scale(16), '#AAAAAA');
-    editIcon.anchor.set(1, 0.5); // Override anchor for specific layout
-    editIcon.position.set(inputX + inputW - scale(10), inputY + inputH / 2 + scale(2));
-    editIcon.eventMode = 'none'; // Allow clicks to pass through to background
+    editIcon.anchor.set(1, 0.5);
+    editIcon.position.set(inputX + inputW - scale(15), inputY + inputH / 2 + scale(2));
+    editIcon.eventMode = 'none';
     this.card.addChild(editIcon);
+  }
 
-    // Save to Cloud Button
-    const btnY = inputY + inputH + scale(40);
-    const saveBtn = UIFactory.createButton(
-      'Cloud Save', // Using hardcoded English temporarily or need a key
-      width - scale(80),
-      scale(40),
-      0xF4A045, // Orange
-      '#FFFFFF',
-      () => {
-        const repo = 'wangicheng/opendots';
-        const baseUrl = `https://github.com/${repo}/issues/new`;
-
-        const payloadData: any = {};
-        if (profile.name) payloadData.name = profile.name;
-        if (profile.avatarUrl) payloadData.avatar = profile.avatarUrl;
-
-        const payloadStr = JSON.stringify(payloadData);
-
-        // Warn if payload is too big (mostly due to avatar)
-        if (payloadStr.length > 5000) {
-          const proceed = window.confirm(t('profile.warn_large_payload') || 'Data is large. Proceed to GitHub?');
-          if (!proceed) return;
-        }
-
-        const params = new URLSearchParams({
-          template: 'update_profile.yml',
-          title: '[Data]: Update Profile',
-          labels: 'data-submission',
-          payload: payloadStr
+  private async fetchGitHubProfile(username: string): Promise<void> {
+    try {
+      // Show loading? (Optional)
+      const res = await fetch(`https://api.github.com/users/${username}`);
+      if (res.ok) {
+        const data = await res.json();
+        LevelService.getInstance().updateUserProfile({
+          githubUsername: username,
+          name: data.name || data.login,
+          avatarUrl: data.avatar_url, // Save URL, not blob
+          // We don't save avatarColor, we could potentially derive it from avatar if needed, but keeping existing is fine.
         });
-
-        window.open(`${baseUrl}?${params.toString()}`, '_blank');
+        this.refreshUI();
+        this.emit('profileUpdate');
+      } else {
+        alert('GitHub user not found');
       }
-    );
-    saveBtn.position.set(width / 2, btnY);
-    this.card.addChild(saveBtn);
+    } catch (e) {
+      console.error('Failed to fetch GitHub profile', e);
+      alert('Network error');
+    }
   }
 
   private drawLanguageView(width: number): void {
@@ -437,108 +415,15 @@ export class SettingsUI extends PIXI.Container {
 
 
 
-  private triggerFileUpload(): void {
-    if (this.fileInputElement) {
-      this.removeFileInput();
-    }
 
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.style.display = 'none';
-    document.body.appendChild(input);
-
-    input.addEventListener('change', (e: Event) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (readerEvent) => {
-          const result = readerEvent.target?.result as string;
-          if (result) {
-            // Process Image: Resize and Compress
-            const img = new Image();
-            img.onerror = () => {
-              console.error('Failed to load uploaded image');
-            };
-            img.onload = () => {
-              let w = img.width;
-              let h = img.height;
-
-              // Resize logic
-              if (w > MAX_AVATAR_SIZE || h > MAX_AVATAR_SIZE) {
-                if (w > h) {
-                  h = Math.round(h * (MAX_AVATAR_SIZE / w));
-                  w = MAX_AVATAR_SIZE;
-                } else {
-                  w = Math.round(w * (MAX_AVATAR_SIZE / h));
-                  h = MAX_AVATAR_SIZE;
-                }
-              }
-
-              const canvas = document.createElement('canvas');
-              canvas.width = w;
-              canvas.height = h;
-              const ctx = canvas.getContext('2d');
-              if (ctx) {
-                ctx.drawImage(img, 0, 0, w, h);
-
-                // Compress to JPEG using binary search (3 iterations)
-                let minQ = 0.0;
-                let maxQ = 1.0;
-                let bestUrl = canvas.toDataURL('image/jpeg', 0.1); // Fallback
-
-                for (let i = 0; i < 3; i++) {
-                  const midQ = (minQ + maxQ) / 2;
-                  const url = canvas.toDataURL('image/jpeg', midQ);
-                  // More accurate byte calculation
-                  const base64Data = url.split(',')[1] || '';
-                  const bytes = base64Data.length * 0.75;
-
-                  if (bytes <= MAX_AVATAR_BYTES) {
-                    bestUrl = url;
-                    minQ = midQ;
-                  } else {
-                    maxQ = midQ;
-                  }
-                }
-
-                LevelService.getInstance().updateUserProfile({ avatarUrl: bestUrl });
-                this.refreshUI();
-                this.emit('profileUpdate');
-              }
-            };
-            img.src = result;
-          }
-        };
-        reader.readAsDataURL(file);
-      }
-      this.removeFileInput();
-    });
-
-    // Cancel/Cleanup
-    // Note: 'cancel' event support is limited, but we can try to detect focus return or just leave it attached until next open
-    // Ideally we remove it after some timeout or on blur, but file inputs are tricky. 
-    // We will just remove it after selection or explicitly when re-triggered.
-
-    input.click();
-    this.fileInputElement = input;
-  }
-
-  private removeFileInput(): void {
-    if (this.fileInputElement) {
-      if (this.fileInputElement.parentNode) {
-        this.fileInputElement.parentNode.removeChild(this.fileInputElement);
-      }
-      this.fileInputElement = null;
-    }
-  }
 
 
 
   public destroy(options?: any): void {
     window.removeEventListener('resize', this.handleResize);
     LanguageManager.getInstance().unsubscribe(this.handleLanguageChange);
-    this.removeFileInput();
+    // this.removeFileInput();
+
     super.destroy(options);
   }
 }

@@ -9,10 +9,6 @@ const DATA_FILE = process.env.DATA_FILE_PATH || path.join(__dirname, '../public/
 // --- Schemas ---
 
 const PayloadSchemas = {
-  update_profile: z.object({
-    avatar: z.string().optional(),
-    name: z.string().optional(),
-  }),
   publish_level: z.object({
     id: z.string().optional(),
     data: z.any(),
@@ -111,15 +107,6 @@ async function run() {
 
     // Apply Changes
     switch (action) {
-      case 'update_profile':
-        if (validatedPayload.avatar !== undefined) {
-          user.avatar = validatedPayload.avatar;
-        }
-        if (validatedPayload.name !== undefined) {
-          user.name = validatedPayload.name;
-        }
-        break;
-
       case 'publish_level':
         // Use Issue Number as the Level ID
         const levelId = issue.number.toString();

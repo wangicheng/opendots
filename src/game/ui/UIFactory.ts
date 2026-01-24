@@ -80,14 +80,14 @@ export class UIFactory {
 
     // 2. Load Image if URL exists
     if (url) {
-      // We use a unique load ID or just let PIXI handle cache? 
-      // PIXI handles cache. We just need to handle component destruction which is hard here without context.
-      // However, usually it's fine if we add child to a destroyed container, it just won't render.
-      // But we should check if destroyed to avoid errors.
+      // Use HTML Image to handle cross-origin loading
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
 
-      PIXI.Assets.load(url).then((texture) => {
+      img.onload = () => {
         if (container.destroyed) return;
 
+        const texture = PIXI.Texture.from(img);
         const sprite = new PIXI.Sprite(texture);
 
         // Aspect Fit/Cover Logic (Cover)
@@ -115,11 +115,13 @@ export class UIFactory {
         border.circle(0, 0, radius);
         border.stroke({ width: scale(4), color: strokeColor });
         container.addChild(border);
+      };
 
-        // Hide background? No, keep it behind just in case of transparency or loading delay (already covered).
-      }).catch((err) => {
-        console.error('UIFactory: Failed to load avatar', err);
-      });
+      img.onerror = (err) => {
+        console.error('UIFactory: Failed to load avatar image', url, err);
+      };
+
+      img.src = url;
     } else {
       // If no URL, draw border on the fallback
       const border = new PIXI.Graphics();

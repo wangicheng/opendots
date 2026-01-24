@@ -75,7 +75,7 @@ export class UserProfileCard extends PIXI.Container {
     const previewWidth = finalLeftWidth;
     const previewHeight = previewWidth * (9 / 16);
 
-    const statsAreaHeight = scale(80);
+    const statsAreaHeight = scale(40); // Reduced: only published date now
     const cardHeight = previewHeight + statsAreaHeight + (padding * 2);
 
     // 2. Card Container
@@ -119,7 +119,7 @@ export class UserProfileCard extends PIXI.Container {
     infoContainer.position.set(0, previewHeight + scale(15));
     leftCol.addChild(infoContainer);
 
-    // 2a. Text Stats (Vertical List)
+    // 2a. Text Stats (Only Published Date)
     const textStats = new PIXI.Container();
     infoContainer.addChild(textStats);
 
@@ -148,24 +148,6 @@ export class UserProfileCard extends PIXI.Container {
 
     textStats.addChild(createStatRow(labelText, dateStr, 0));
 
-    const attempts = this.levelData.attempts ?? 0;
-    textStats.addChild(createStatRow(t('level.attempts'), attempts.toString(), scale(25)));
-
-    const clears = this.levelData.clears ?? 0;
-    const percentage = attempts > 0 ? Math.round((clears / attempts) * 100) : 0;
-    textStats.addChild(createStatRow(t('level.clears'), `${clears} (${percentage}%)`, scale(50)));
-
-    // 2b. Like Button (Right of Stats)
-    const likeBtnWidth = scale(100);
-    const likeBtnHeight = scale(36);
-    // Force likes to 0 and disable interaction logic inside createLikeButton or visual only
-    const likeBtn = this.createLikeButton(0, likeBtnWidth, likeBtnHeight);
-
-    // Position Like button at the right edge of the left column
-    // Vertically center with the text stats block (roughly 75px height)
-    likeBtn.position.set(previewWidth - likeBtnWidth, (scale(75) - likeBtnHeight) / 2);
-    infoContainer.addChild(likeBtn);
-
     // --- RIGHT COLUMN (Author) ---
     const rightCol = new PIXI.Container();
     rightCol.position.set(padding + finalLeftWidth + gap, padding);
@@ -186,7 +168,7 @@ export class UserProfileCard extends PIXI.Container {
     const centerX = subCardWidth / 2;
 
     // Avatar
-    const avatarRadius = scale(70);
+    const avatarRadius = scale(60);
     let topY = scale(30);
 
     let profileColor = this.userColor;
@@ -195,6 +177,9 @@ export class UserProfileCard extends PIXI.Container {
       const profile = LevelService.getInstance().getUserProfile();
       profileColor = profile.avatarColor;
       profileUrl = profile.avatarUrl;
+    } else {
+      // Remote User - Construct GitHub Avatar URL (use avatars subdomain for CORS support)
+      profileUrl = `https://avatars.githubusercontent.com/${this.levelData.authorId}`;
     }
 
     const avatar = UIFactory.createAvatar(avatarRadius, profileUrl, profileColor);
@@ -252,91 +237,7 @@ export class UserProfileCard extends PIXI.Container {
     card.addChild(closeBtn);
   }
 
-  private createLikeButton(initialLikes: number, width: number, height?: number): PIXI.Container {
-    const container = new PIXI.Container();
 
-    // Button styling
-    const w = width;
-    const h = height || scale(36);
-    const r = h / 2; // Fully rounded (Pill shape)
-
-    // Default: Outline
-    const bg = UIFactory.createPill(w, h, 0xFFFFFF, 0xFF6B6B, 2);
-    container.addChild(bg);
-
-    // Icon (Thumbs Up)
-    const icon = UIFactory.createIcon('\uF406', scale(20), '#FF6B6B');
-    // Position set later in updateLayout
-    container.addChild(icon);
-
-    // Count
-    let count = initialLikes;
-    const countText = new PIXI.Text({
-      text: count.toString(),
-      style: {
-        fontFamily: 'Arial',
-        fontSize: scale(24),
-        fill: '#FF6B6B',
-        fontWeight: 'bold'
-      }
-    });
-    countText.anchor.set(0, 0.5);
-    container.addChild(countText);
-
-    const updateLayout = () => {
-      const spacing = scale(12);
-      const totalW = icon.width + spacing + countText.width;
-      const startX = (w - totalW) / 2;
-
-      icon.position.set(startX + icon.width / 2, h / 2 + scale(2));
-      countText.position.set(startX + icon.width + spacing, h / 2);
-    };
-
-    updateLayout();
-
-    // Interaction
-    container.eventMode = 'static';
-    container.cursor = 'pointer';
-
-    let liked = !!this.levelData.isLikedByCurrentUser;
-    const baseCount = liked ? (initialLikes - 1) : initialLikes;
-
-    const updateVisuals = () => {
-      const currentCount = baseCount + (liked ? 1 : 0);
-      countText.text = currentCount.toString();
-      updateLayout();
-
-      if (liked) {
-        bg.clear();
-        bg.roundRect(0, 0, w, h, r);
-        bg.fill({ color: 0xFF6B6B });
-        icon.style.fill = '#FFFFFF';
-        countText.style.fill = '#FFFFFF';
-      } else {
-        bg.clear();
-        bg.roundRect(0, 0, w, h, r);
-        bg.stroke({ width: 2, color: 0xFF6B6B });
-        bg.fill({ color: 0xFFFFFF });
-        icon.style.fill = '#FF6B6B';
-        countText.style.fill = '#FF6B6B';
-      }
-    };
-
-    updateVisuals();
-
-    // Disable interaction for now as requested
-    /*
-    container.on('pointertap', () => {
-      liked = !liked;
-      this.levelData.isLikedByCurrentUser = liked;
-      this.levelData.likes = baseCount + (liked ? 1 : 0);
-      if (this.onLikeToggleCallback) this.onLikeToggleCallback();
-      updateVisuals();
-    });
-    */
-
-    return container;
-  }
 
   private createViewLevelsButton(width: number): PIXI.Container {
     const w = width;

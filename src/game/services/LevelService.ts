@@ -13,6 +13,7 @@ export interface UserProfile {
   name: string;
   avatarColor: number;
   avatarUrl?: string;
+  githubUsername?: string;
 }
 
 export class LevelService {

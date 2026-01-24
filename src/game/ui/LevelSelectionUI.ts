@@ -503,6 +503,9 @@ export class LevelSelectionUI extends PIXI.Container {
       const profile = LevelService.getInstance().getUserProfile();
       color = profile.avatarColor; // Override color
       profileUrl = profile.avatarUrl;
+    } else if (levelData.authorId) {
+      // Remote User - Construct GitHub Avatar URL (use avatars subdomain for CORS support)
+      profileUrl = `https://avatars.githubusercontent.com/${levelData.authorId}`;
     }
 
     // Use UIFactory to create avatar
