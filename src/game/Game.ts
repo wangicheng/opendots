@@ -1209,9 +1209,26 @@ export class Game {
       obj.update(scaleFactor);
     }
 
-    // Drawn lines from physics
-    for (const line of this.drawnLines) {
+    // Drawn lines from physics (update and check out-of-bounds)
+    const drawnLineBoundary = getCanvasHeight() + getCanvasHeight() * 0.5;
+    for (let i = this.drawnLines.length - 1; i >= 0; i--) {
+      const line = this.drawnLines[i];
       line.update(scaleFactor);
+
+      // Check if line's center of mass is below screen bottom by more than half screen height
+      const pos = line.body.translation();
+      const pixelY = this.physicsWorld.toPixels(pos.x, pos.y).y * scaleFactor;
+      if (pixelY > drawnLineBoundary) {
+        // Remove from collider handles
+        for (const collider of line.colliders) {
+          this.drawnLineColliderHandles.delete(collider.handle);
+        }
+        // Remove from active conveyor contacts
+        this.activeConveyorContacts = this.activeConveyorContacts.filter(c => c.body !== line.body);
+        // Destroy the line
+        line.destroy(this.physicsWorld);
+        this.drawnLines.splice(i, 1);
+      }
     }
 
     // Ice blocks (melting and removal)
