@@ -6,6 +6,8 @@ import {
 } from '../config';
 import { UIFactory } from './UIFactory';
 import { LanguageManager, type TranslationKey } from '../i18n/LanguageManager';
+import { ObjectSelector, type EditorObject } from './editor/ObjectSelector';
+import { PropertyInspector } from './editor/PropertyInspector';
 
 // Local visual constants matches object definitions
 const LASER_COLOR = 0x00FF00; // Green for laser
@@ -40,6 +42,15 @@ export class EditorUI extends PIXI.Container {
   private onDelete: () => void;
   private onRestart: () => void;
   private onPen: () => void;
+  private onRequestSelect: (obj: EditorObject) => void;
+  private getObjects: () => EditorObject[];
+  private onObjectModified: (obj: EditorObject) => void;
+
+  private objectListBtn: PIXI.Container | null = null;
+
+  private objectSelector: ObjectSelector | null = null;
+  private propertyInspector: PropertyInspector | null = null;
+  private currentSelection: EditorObject | null = null;
 
   private playHomeBtn: PIXI.Container | null = null;
   private playRestartBtn: PIXI.Container | null = null;
@@ -48,6 +59,7 @@ export class EditorUI extends PIXI.Container {
   // State tracking for layout restoration
   private lastHasSelection: boolean = false;
   private lastIsBall: boolean = false;
+  private savedSelection: EditorObject | null = null;
 
   constructor(
     onClose: () => void,
@@ -56,7 +68,10 @@ export class EditorUI extends PIXI.Container {
     onCopy: () => void,
     onDelete: () => void,
     onRestart: () => void,
-    onPen: () => void
+    onPen: () => void,
+    onRequestSelect: (obj: EditorObject) => void,
+    getObjects: () => EditorObject[],
+    onObjectModified: (obj: EditorObject) => void
   ) {
     super();
     // Set to passive so pointer events pass through to game container for drawing
@@ -68,6 +83,9 @@ export class EditorUI extends PIXI.Container {
     this.onDelete = onDelete;
     this.onRestart = onRestart;
     this.onPen = onPen;
+    this.onRequestSelect = onRequestSelect;
+    this.getObjects = getObjects;
+    this.onObjectModified = onObjectModified;
 
     this.updateLayout();
   }
@@ -106,6 +124,12 @@ export class EditorUI extends PIXI.Container {
     this.copyBtn = UIFactory.createTopBarButton('\uF759', this.onCopy);
     this.copyBtn.position.set(copyX, btnY);
     this.toolsContainer.addChild(this.copyBtn);
+
+    // Advanced Tools Button
+    const toolsX = copyX - btnSpacing - btnSize;
+    this.objectListBtn = UIFactory.createTopBarButton('\uF5DB', () => this.toggleAdvancedTools());
+    this.objectListBtn.position.set(toolsX, btnY);
+    this.toolsContainer.addChild(this.objectListBtn);
 
     // Restore tool state
     this.updateTools(this.lastHasSelection, this.lastIsBall);
@@ -158,9 +182,19 @@ export class EditorUI extends PIXI.Container {
           this.onToggleMode('edit');
           this.updateToggleState();
           this.setUIState('edit');
+
+          if (this.savedSelection) {
+            // Validate if object still exists
+            const exists = this.getObjects().find(o => o.data === this.savedSelection!.data);
+            if (exists) {
+              this.onRequestSelect(exists);
+            }
+            this.savedSelection = null;
+          }
         }
       } else {
         if (this.currentMode !== 'play') {
+          this.savedSelection = this.currentSelection;
           this.currentMode = 'play';
           // Force UI update immediately if desired, or wait for Game to confirm? 
           // Let's assume Game might verify, but here we update UI for responsiveness.
@@ -252,11 +286,19 @@ export class EditorUI extends PIXI.Container {
     this.updateToggleState();
 
     if (mode === 'edit') {
-      if (this.bottomBar) this.bottomBar.visible = true;
-      if (this.tabsContainer) this.tabsContainer.visible = true;
-      if (this.itemsContainer) this.itemsContainer.visible = true;
       if (this.toolsContainer) this.toolsContainer.visible = true;
       if (this.backBtn) this.backBtn.visible = true;
+
+      // Restore Advanced Tools if they were open
+      if (this.objectSelector) {
+        this.objectSelector.visible = true;
+        // Refresh objects array since loadEditorLevel rebuilds it
+        this.objectSelector.updateObjects(this.getObjects());
+      }
+      if (this.propertyInspector) this.propertyInspector.visible = true;
+
+      // Restore Bottom Bar / Tabs / Items depending on state
+      this.updateTools(this.lastHasSelection, this.lastIsBall);
 
       if (this.playHomeBtn) this.playHomeBtn.visible = false;
       if (this.playRestartBtn) this.playRestartBtn.visible = false;
@@ -268,6 +310,10 @@ export class EditorUI extends PIXI.Container {
       if (this.toolsContainer) this.toolsContainer.visible = false;
       // Hide Back button during test play to avoid conflict with Game UI
       if (this.backBtn) this.backBtn.visible = false;
+
+      // Hide Advanced Tools
+      if (this.objectSelector) this.objectSelector.visible = false;
+      if (this.propertyInspector) this.propertyInspector.visible = false;
 
       // Show Play Mode Buttons
       if (this.playHomeBtn) this.playHomeBtn.visible = true;
@@ -297,8 +343,17 @@ export class EditorUI extends PIXI.Container {
     this.deleteBtn.alpha = alpha;
     this.deleteBtn.eventMode = mode;
 
-    // Toggle Bottom Bar visibility based on selection
-    const showBottomBar = !hasSelection;
+    // Toggle Bottom Bar visibility based on selection and tools state
+    const advancedToolsOpen = !!this.objectSelector;
+    const showBottomBar = !hasSelection && !advancedToolsOpen;
+
+    if (!hasSelection) {
+      this.currentSelection = null;
+      if (this.objectSelector) {
+        this.objectSelector.setSelection(null);
+      }
+    }
+
     if (this.bottomBar) this.bottomBar.visible = showBottomBar;
     if (this.tabsContainer) this.tabsContainer.visible = showBottomBar;
     if (this.itemsContainer) this.itemsContainer.visible = showBottomBar;
@@ -519,6 +574,10 @@ export class EditorUI extends PIXI.Container {
   }
 
   private drawItemIcon(g: PIXI.Graphics, type: string, subType: string, size: number): void {
+    EditorUI.drawObjectIcon(g, type, subType, size);
+  }
+
+  public static drawObjectIcon(g: PIXI.Graphics, type: string, subType: string, size: number): void {
     // Reset defaults
     g.clear();
 
@@ -620,18 +679,81 @@ export class EditorUI extends PIXI.Container {
   }
 
   public destroy(options?: any): void {
-    this.toggleContainer = null;
-    this.tabsContainer = null;
-    this.itemsContainer = null;
-    this.toolsContainer = null;
-    this.backBtn = null;
-    this.copyBtn = null;
-    this.deleteBtn = null;
-    this.bottomBar = null;
-    this.playHomeBtn = null;
-    this.playRestartBtn = null;
-    this.playPenBtn = null;
+    this.objectListBtn = null;
+    this.objectSelector = null;
+    this.propertyInspector = null;
 
     super.destroy(options);
+  }
+
+  private toggleAdvancedTools() {
+    if (this.objectSelector) {
+      // Hide All
+      this.removeChild(this.objectSelector);
+      this.objectSelector.destroy();
+      this.objectSelector = null;
+
+      if (this.propertyInspector) {
+        this.removeChild(this.propertyInspector);
+        this.propertyInspector.destroy();
+        this.propertyInspector = null;
+      }
+    } else {
+      // Show All
+      const h = getCanvasHeight() - scale(160);
+      const selectorWidth = scale(80);
+      const selectorX = getCanvasWidth() - selectorWidth - scale(20);
+
+      this.objectSelector = new ObjectSelector(selectorWidth, h, this.getObjects(), (obj) => {
+        this.onRequestSelect(obj);
+      }, this.currentSelection);
+      this.objectSelector.position.set(selectorX, scale(100));
+      this.addChild(this.objectSelector);
+
+      // If selection exists, also show properties
+      if (this.currentSelection) {
+        this.showPropertyInspector(this.currentSelection);
+      }
+    }
+
+    // Update toolbar visibility
+    this.updateTools(this.lastHasSelection, this.lastIsBall);
+  }
+
+  private showPropertyInspector(obj: EditorObject) {
+    if (this.propertyInspector) {
+      this.removeChild(this.propertyInspector);
+      this.propertyInspector.destroy();
+    }
+
+    const h = getCanvasHeight() - scale(160);
+    const inspectorWidth = scale(140);
+    // Position to the left of the object selector (which is at right edge)
+    // Selector is width 80, margin 20. Total space 100.
+    // Gap 10.
+    // Inspector X = Width - 100 - 10 - 140 = Width - 250.
+    const inspectorX = getCanvasWidth() - inspectorWidth - scale(110);
+
+    this.propertyInspector = new PropertyInspector(inspectorWidth, h, obj, () => {
+      this.onObjectModified(obj);
+    });
+    this.propertyInspector.position.set(inspectorX, scale(100));
+    this.addChild(this.propertyInspector);
+  }
+
+  public setSelectedObject(obj: EditorObject) {
+    this.currentSelection = obj;
+
+    // Only update UI if tools are active (indicated by objectSelector presence)
+    if (this.objectSelector) {
+      this.objectSelector.setSelection(obj);
+      this.showPropertyInspector(obj);
+    }
+  }
+
+  public refreshPropertyInspector() {
+    if (this.propertyInspector) {
+      this.propertyInspector.updateValuesFromTarget();
+    }
   }
 }

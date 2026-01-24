@@ -98,7 +98,7 @@ export class Game {
   private editorUI: EditorUI | null = null;
   private editingLevel: LevelData | null = null;
   private editorHasChanged: boolean = false;
-  private editorObjects: { container: PIXI.Container, data: any, type: string }[] = [];
+  private editorObjects: { container: PIXI.Container, data: any, type: string, lastFocused: number }[] = [];
   private selectedObject: { container: PIXI.Container, data: any, type: string } | null = null;
   private transformGizmo: TransformGizmo | null = null;
   private initialAuthorPassed: boolean = false;
@@ -1360,7 +1360,10 @@ export class Game {
           () => this.copySelectedObject(),
           () => this.deleteSelectedObject(),
           () => this.restartLevel(),
-          () => this.showPenSelection()
+          () => this.showPenSelection(),
+          (obj) => this.selectObject(obj.container, obj.data, obj.type),
+          () => this.editorObjects,
+          (obj) => this.updateEditorObject(obj)
         );
         this.uiLayer.addChild(this.editorUI);
       }
@@ -1703,23 +1706,33 @@ export class Game {
     this.gameContainer.addChild(this.transformGizmo);
 
     // Show Editor UI
-    if (this.editorUI) {
-      this.uiLayer.removeChild(this.editorUI);
-      this.editorUI.destroy();
-      this.editorUI = null;
+    if (isNewSession) {
+      // Only rebuild EditorUI for new editing sessions
+      if (this.editorUI) {
+        this.uiLayer.removeChild(this.editorUI);
+        this.editorUI.destroy();
+        this.editorUI = null;
+      }
+
+      this.editorUI = new EditorUI(
+        () => this.handleEditorClose(), // On Close
+        (mode) => this.toggleEditorMode(mode),     // On Mode Toggle
+        (type, subType, initialEventData) => this.addObject(type, subType, initialEventData),   // On Add Object
+        () => this.copySelectedObject(), // On Copy
+        () => this.deleteSelectedObject(), // On Delete
+        () => this.restartLevel(), // On Restart
+        () => this.showPenSelection(), // On Pen
+        (obj) => this.selectObject(obj.container, obj.data, obj.type),
+        () => this.editorObjects,
+        (obj) => this.updateEditorObject(obj)
+      );
+      this.uiLayer.addChild(this.editorUI);
     }
 
-    this.editorUI = new EditorUI(
-      () => this.handleEditorClose(), // On Close
-      (mode) => this.toggleEditorMode(mode),     // On Mode Toggle
-      (type, subType, initialEventData) => this.addObject(type, subType, initialEventData),   // On Add Object
-      () => this.copySelectedObject(), // On Copy
-      () => this.deleteSelectedObject(), // On Delete
-      () => this.restartLevel(), // On Restart
-      () => this.showPenSelection() // On Pen
-    );
-    this.uiLayer.addChild(this.editorUI);
-    this.editorUI.setUIState('edit');
+    // Always ensure EditorUI is in edit state
+    if (this.editorUI) {
+      this.editorUI.setUIState('edit');
+    }
   }
 
   private toggleEditorMode = (mode: 'edit' | 'play') => {
@@ -1830,6 +1843,12 @@ export class Game {
 
     this.selectedObject = { container, data, type };
 
+    // Update lastFocused
+    const editorObj = this.editorObjects.find(o => o.container === container);
+    if (editorObj) {
+      editorObj.lastFocused = Date.now();
+    }
+
     // Disable the selected object's event mode so gizmo receives events
     container.eventMode = 'none';
 
@@ -1852,6 +1871,11 @@ export class Game {
     if (this.editorUI) {
       const isBall = type === 'ball_blue' || type === 'ball_pink';
       this.editorUI.updateTools(true, isBall);
+
+      // Notify Property Inspector
+      if (editorObj) {
+        this.editorUI.setSelectedObject(editorObj);
+      }
     }
   }
 
@@ -1886,6 +1910,11 @@ export class Game {
 
     // Update outline to match new shape
     this.updateEditorOutline(container, type, data, EDITOR_OUTLINE_WIDTH_FOCUSED, EDITOR_SELECTION_COLOR);
+
+    // Sync changes to UI
+    if (this.editorUI) {
+      this.editorUI.refreshPropertyInspector();
+    }
   }
 
   /**
@@ -1898,6 +1927,19 @@ export class Game {
   /**
    * Rebuild the visual representation of an object after transform changes
    */
+  private updateEditorObject(editorObj: { container: PIXI.Container, data: any, type: string }): void {
+    const { container, data, type } = editorObj;
+    this.rebuildObjectVisual(container, data, type);
+    this.updateEditorOutline(container, type, data, EDITOR_OUTLINE_WIDTH_FOCUSED, EDITOR_SELECTION_COLOR);
+
+    // Update Gizmo if this object is selected
+    if (this.transformGizmo && this.selectedObject && this.selectedObject.container === container) {
+      this.transformGizmo.updateGizmo();
+    }
+
+    this.markAsEdited();
+  }
+
   private rebuildObjectVisual(container: PIXI.Container, data: any, type: string): void {
     const scaleFactor = getScaleFactor();
 
@@ -2165,7 +2207,7 @@ export class Game {
     });
 
     this.gameContainer.addChild(visual);
-    this.editorObjects.push({ container: visual, data, type });
+    this.editorObjects.push({ container: visual, data, type, lastFocused: 0 });
 
     // Auto-select newly created objects
     if (initialSelect) {
