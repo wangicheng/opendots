@@ -25,5 +25,15 @@ export const auth = (env: Env) => {
       openAPI(),
     ],
     trustedOrigins: ["http://localhost:5173", "https://opendots.pages.dev", "https://wangicheng.github.io"],
+    secret: env.BETTER_AUTH_SECRET,
+    advanced: {
+      defaultCookieAttributes: {
+        sameSite: "none",
+        secure: true,
+      },
+      crossSubDomainCookies: {
+        enabled: true
+      }
+    }
   });
 };

@@ -10,7 +10,7 @@ export const authClient = createAuthClient({
 export const signInWithGoogle = async () => {
   await authClient.signIn.social({
     provider: "google",
-    callbackURL: window.location.origin, // Redirect back to app
+    callbackURL: `${window.location.origin}${import.meta.env.BASE_URL}`, // Redirect back to app with correct base path
   });
 };
 
