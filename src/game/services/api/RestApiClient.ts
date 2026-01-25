@@ -18,11 +18,14 @@ export class RestApiClient implements IApiClient {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
+    const userId = localStorage.getItem('opendots_user_id');
+
     const url = `${this.baseUrl}${endpoint}`;
     const response = await fetch(url, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
+        'x-user-id': userId || '', // Pass user ID to backend
         ...options.headers,
       },
     });

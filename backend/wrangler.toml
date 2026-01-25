@@ -1,0 +1,13 @@
+name = "opendots-backend"
+main = "src/index.ts"
+compatibility_date = "2025-01-24"
+
+# D1 Database Binding
+# Run `npx wrangler d1 create opendots-db` to generate an ID, then replace it here.
+[[d1_databases]]
+binding = "DB"
+database_name = "opendots-db"
+database_id = "c0ef34dc-2908-4e58-a986-efdabaa64cb9"
+
+[observability]
+enabled = true
