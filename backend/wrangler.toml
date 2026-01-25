@@ -1,6 +1,7 @@
 name = "opendots-backend"
 main = "src/index.ts"
 compatibility_date = "2025-01-24"
+compatibility_flags = ["nodejs_compat"]
 
 # D1 Database Binding
 # Run `npx wrangler d1 create opendots-db` to generate an ID, then replace it here.
@@ -8,6 +9,9 @@ compatibility_date = "2025-01-24"
 binding = "DB"
 database_name = "opendots-db"
 database_id = "c0ef34dc-2908-4e58-a986-efdabaa64cb9"
+
+[vars]
+BETTER_AUTH_URL = "https://opendots-backend.opendots-game.workers.dev"
 
 [observability]
 enabled = true

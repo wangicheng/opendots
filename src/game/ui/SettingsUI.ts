@@ -130,8 +130,67 @@ export class SettingsUI extends PIXI.Container {
     // Header
     this.drawHeader(width, { title: t('profile.title'), showBack: true, onBack: () => this.setView('list') });
 
-    const profile = LevelService.getInstance().getUserProfile();
+    // Check Status
+    const service = LevelService.getInstance();
+    const isLoggedIn = service.isLoggedIn();
+    const profile = service.getUserProfile();
     const centerX = width / 2;
+
+    if (!isLoggedIn || !profile) {
+      // --- GUEST STATE: SHOW GOOGLE LOGIN ---
+
+      const infoText = new PIXI.Text({
+        text: 'Sign in with Google to create levels, \nlike levels, and sync your profile.',
+        style: {
+          fontFamily: 'Arial',
+          fontSize: scale(16),
+          fill: '#555555',
+          align: 'center',
+          wordWrap: true,
+          wordWrapWidth: width - scale(80)
+        }
+      });
+      infoText.anchor.set(0.5);
+      infoText.position.set(centerX, scale(150));
+      this.card.addChild(infoText);
+
+      // Render Simple Button for better-auth (redirects)
+      const btnW = scale(250);
+      const btnH = scale(50);
+      const btnContainer = new PIXI.Container();
+
+      const bg = new PIXI.Graphics();
+      bg.roundRect(-btnW / 2, -btnH / 2, btnW, btnH, btnH / 2);
+      bg.fill(0xFFFFFF);
+      bg.stroke({ width: 1, color: 0xCCCCCC });
+
+      const btnText = new PIXI.Text({
+        text: 'Sign in with Google',
+        style: {
+          fontFamily: 'Arial',
+          fontSize: scale(18),
+          fill: '#555555',
+          fontWeight: 'bold'
+        }
+      });
+      btnText.anchor.set(0.5);
+
+      btnContainer.addChild(bg);
+      btnContainer.addChild(btnText);
+      btnContainer.position.set(centerX, scale(250));
+
+      btnContainer.eventMode = 'static';
+      btnContainer.cursor = 'pointer';
+      btnContainer.on('pointertap', () => {
+        service.loginWithGoogle(''); // Arg ignored
+      });
+
+      this.card.addChild(btnContainer);
+
+      return;
+    }
+
+    // --- LOGGED IN STATE ---
 
     // Avatar Section
     const avatarY = scale(120);
@@ -146,90 +205,57 @@ export class SettingsUI extends PIXI.Container {
     avatarContainer.position.set(centerX, avatarY);
     this.card.addChild(avatarContainer);
 
-    // Avatar Interaction (Upload Image)
-    avatarContainer.eventMode = 'static';
-    avatarContainer.cursor = 'pointer';
-    avatarContainer.on('pointertap', () => {
-      this.triggerFileUpload();
-    });
-
-    const changeText = new PIXI.Text({
-      text: t('profile.upload'),
-      style: {
-        fontFamily: 'Arial',
-        fontSize: scale(12),
-        fill: '#AAAAAA'
-      }
-    });
-    changeText.anchor.set(0.5);
-    changeText.position.set(centerX, avatarY + avatarRadius + scale(15));
-    this.card.addChild(changeText);
-
-
     // Name Section
-    const nameY = avatarY + avatarRadius + scale(60);
-
-    const nameLabel = new PIXI.Text({
-      text: t('profile.name'),
-      style: {
-        fontFamily: 'Arial',
-        fontSize: scale(14),
-        fill: '#888888',
-        fontWeight: 'bold'
-      }
-    });
-    nameLabel.position.set(scale(40), nameY);
-    this.card.addChild(nameLabel);
-
-    // Name Display / Edit Box (Pill shape)
-    const inputW = width - scale(80);
-    const inputH = scale(40);
-    const inputX = scale(40);
-    const inputY = nameY + scale(25);
-
-    // used roundRect... but wait, createPill uses full radius.
-    // original: inputH / 2. Yes, it is a pill.
-    const inputBg = UIFactory.createPill(inputW, inputH, 0xF5F5F5, 0xDDDDDD, 1);
-    inputBg.position.set(inputX, inputY);
-
-    // Interaction to edit
-    inputBg.eventMode = 'static';
-    inputBg.cursor = 'text';
-    inputBg.on('pointertap', () => {
-      let result = window.prompt(t('profile.prompt'), profile.name);
-      if (result !== null) {
-        let trimmed = result.trim();
-        if (trimmed.length > 0) {
-          if (trimmed.length > MAX_NAME_LENGTH) {
-            trimmed = trimmed.substring(0, MAX_NAME_LENGTH);
-          }
-          LevelService.getInstance().updateUserProfile({ name: trimmed });
-          this.refreshUI();
-          this.emit('profileUpdate');
-        }
-      }
-    });
-    this.card.addChild(inputBg);
-
+    const nameY = avatarY + avatarRadius + scale(40);
     const nameText = new PIXI.Text({
       text: profile.name,
       style: {
         fontFamily: 'Arial',
-        fontSize: scale(18),
-        fill: '#333333'
+        fontSize: scale(24),
+        fill: '#333333',
+        fontWeight: 'bold'
       }
     });
-    nameText.anchor.set(0, 0.5);
-    nameText.position.set(inputX + scale(10), inputY + inputH / 2);
-    nameText.eventMode = 'none'; // Allow clicks to pass through to background
+    nameText.anchor.set(0.5);
+    nameText.position.set(centerX, nameY);
     this.card.addChild(nameText);
 
-    const editIcon = UIFactory.createIcon('\uF4CB', scale(16), '#AAAAAA');
-    editIcon.anchor.set(1, 0.5); // Override anchor for specific layout
-    editIcon.position.set(inputX + inputW - scale(10), inputY + inputH / 2 + scale(2));
-    editIcon.eventMode = 'none'; // Allow clicks to pass through to background
-    this.card.addChild(editIcon);
+    // Logout Button
+    const logoutY = nameY + scale(60);
+    const logoutBtn = new PIXI.Container();
+
+    const btnWToken = scale(120);
+    const btnHToken = scale(40);
+    const btnBgToken = new PIXI.Graphics();
+    btnBgToken.roundRect(-btnWToken / 2, -btnHToken / 2, btnWToken, btnHToken, btnHToken / 2);
+    btnBgToken.fill(0xFFEEEE);
+    btnBgToken.stroke({ width: 1, color: 0xFF0000 });
+
+    const btnTextToken = new PIXI.Text({
+      text: 'Logout',
+      style: {
+        fontFamily: 'Arial',
+        fontSize: scale(16),
+        fill: '#FF0000'
+      }
+    });
+    btnTextToken.anchor.set(0.5);
+
+    logoutBtn.addChild(btnBgToken);
+    logoutBtn.addChild(btnTextToken);
+    logoutBtn.position.set(centerX, logoutY);
+    logoutBtn.eventMode = 'static';
+    logoutBtn.cursor = 'pointer';
+    logoutBtn.on('pointertap', () => {
+      service.logout();
+      this.refreshUI(); // Might need reload if logout reloads page
+    });
+
+    this.card.addChild(logoutBtn);
   }
+
+  // Removed Google DOM handling
+
 
   private drawLanguageView(width: number): void {
     const t = (key: TranslationKey) => LanguageManager.getInstance().t(key);
@@ -393,6 +419,7 @@ export class SettingsUI extends PIXI.Container {
   }
 
   private setView(view: SettingsView): void {
+    // this.removeGoogleButton(); // No longer needed
     this.currentView = view;
     // Clear Input if switching views
     this.refreshUI();
@@ -502,6 +529,7 @@ export class SettingsUI extends PIXI.Container {
     window.removeEventListener('resize', this.handleResize);
     LanguageManager.getInstance().unsubscribe(this.handleLanguageChange);
     this.removeFileInput();
+    // this.removeGoogleButton();
     super.destroy(options);
   }
 }

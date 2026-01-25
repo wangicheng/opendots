@@ -18,16 +18,29 @@ export class RestApiClient implements IApiClient {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
-    const userId = localStorage.getItem('opendots_user_id');
-
     const url = `${this.baseUrl}${endpoint}`;
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      // @ts-ignore
+      ...(options.headers as Record<string, string>),
+    };
+
+    // Add Auth Token if available
+    const token = localStorage.getItem('opendots_auth_token');
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    } else {
+      // Fallback for public browsing or legacy
+      const userId = localStorage.getItem('opendots_user_id');
+      if (userId) {
+        headers['x-user-id'] = userId;
+      }
+    }
+
     const response = await fetch(url, {
       ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-id': userId || '', // Pass user ID to backend
-        ...options.headers,
-      },
+      headers,
     });
 
     if (!response.ok) {
@@ -110,6 +123,23 @@ export class RestApiClient implements IApiClient {
 
   async getUserLevels(userId: string): Promise<LevelData[]> {
     return this.request<LevelData[]>(`/users/${userId}/levels`);
+  }
+
+  // ==================== Auth ====================
+
+  async loginWithGoogle(token: string): Promise<{ token: string; user: UserProfile }> {
+    return this.request<{ token: string; user: UserProfile }>('/auth/google', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    });
+  }
+
+  async logout(): Promise<void> {
+    try {
+      await this.request<void>('/auth/logout', { method: 'POST' });
+    } catch (e) {
+      console.warn('Logout failed on server', e);
+    }
   }
 
   // ==================== Stats ====================

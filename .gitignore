@@ -26,3 +26,8 @@ dist-ssr
 # Cloudflare Wrangler
 .wrangler
 
+
+# Secrets
+.env
+.dev.vars
+backend/.dev.vars

@@ -225,3 +225,9 @@ export const Z_INDEX = {
 
 // API Configuration
 export const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+
+// Google Auth Configuration
+// TODO: Replace with your actual Client ID from Google Cloud Console
+export const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
+(window as any).GOOGLE_CLIENT_ID = GOOGLE_CLIENT_ID;
+

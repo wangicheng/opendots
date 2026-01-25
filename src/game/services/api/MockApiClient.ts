@@ -220,4 +220,20 @@ export class MockApiClient implements IApiClient {
     this.stats.set(levelId, current);
     this.saveToStorage();
   }
+
+  // ==================== Auth ====================
+
+  async loginWithGoogle(token: string): Promise<{ token: string; user: UserProfile }> {
+    await this.delay();
+    // Simulate lookup or create
+    return {
+      token: 'mock_token',
+      user: this.users.get(CURRENT_USER_ID)!
+    };
+  }
+
+  async logout(): Promise<void> {
+    await this.delay();
+    // No-op
+  }
 }

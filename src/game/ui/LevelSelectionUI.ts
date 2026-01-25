@@ -135,10 +135,13 @@ export class LevelSelectionUI extends PIXI.Container {
 
     // "Mine" Button
     this.mineBtnText = this.createHeaderInteractiveText(t('sort.mine'), 0, sortY, () => {
-      if (this.filterAuthorId === CURRENT_USER_ID) {
+      const currentUserId = LevelService.getInstance().getUserProfile()?.id;
+      if (!currentUserId) return; // Should not happen if button is hidden/disabled, or handle gracefully
+
+      if (this.filterAuthorId === currentUserId) {
         this.setFilterAuthor(null);
       } else {
-        this.setFilterAuthor(CURRENT_USER_ID);
+        this.setFilterAuthor(currentUserId);
       }
     });
     this.headerContainer.addChild(this.mineBtnText);
@@ -259,7 +262,8 @@ export class LevelSelectionUI extends PIXI.Container {
   }
 
   private updateSortButtons(): void {
-    const isMine = this.filterAuthorId === CURRENT_USER_ID;
+    const currentUserId = LevelService.getInstance().getUserProfile()?.id;
+    const isMine = this.filterAuthorId === currentUserId && !!currentUserId;
 
     if (this.latestBtnText) {
       const isSelected = this.sortMode === 'latest' && !isMine;
@@ -278,9 +282,12 @@ export class LevelSelectionUI extends PIXI.Container {
       this.mineBtnText.style.fontWeight = isSelected ? 'bold' : 'normal';
     }
 
-    // Toggle FAB visibility based on "Mine" filter
+    // Toggle FAB visibility based on "Mine" filter or just Logged In status?
+    // Requirement: "Login to add". So show FAB only if Logged In? 
+    // And ideally only if "Mine" is selected? Or always allow adding?
+    // Usually "Create" is available always if logged in.
     if (this.createLevelBtn) {
-      this.createLevelBtn.visible = isMine;
+      this.createLevelBtn.visible = !!currentUserId;
     }
   }
 
@@ -384,7 +391,8 @@ export class LevelSelectionUI extends PIXI.Container {
     // Designer Avatar rendering moved to the end to ensure it's on top of any status overlay
 
     // 4.5 Published/Draft Status Overlay
-    if (levelData.authorId === CURRENT_USER_ID && levelData.isPublished === false) {
+    const currentUserId = LevelService.getInstance().getUserProfile()?.id;
+    if (currentUserId && levelData.authorId === currentUserId && levelData.isPublished === false) {
       // 1. Dark Mask (Always for unpublished)
       const darkOverlay = new PIXI.Graphics();
       darkOverlay.rect(0, 0, width, height);
@@ -499,10 +507,12 @@ export class LevelSelectionUI extends PIXI.Container {
 
     // Check if it's CURRENT USER and use their profile
     let profileUrl: string | undefined;
-    if (levelData.authorId === CURRENT_USER_ID) {
+    if (currentUserId && levelData.authorId === currentUserId) {
       const profile = LevelService.getInstance().getUserProfile();
-      color = profile.avatarColor; // Override color
-      profileUrl = profile.avatarUrl;
+      if (profile) {
+        color = profile.avatarColor; // Override color
+        profileUrl = profile.avatarUrl;
+      }
     }
 
     // Use UIFactory to create avatar
@@ -786,7 +796,7 @@ export class LevelSelectionUI extends PIXI.Container {
         this.levels = this.levels.filter(l => l.id !== levelId);
         this.refreshVisibleLevels();
       },
-      this.filterAuthorId === CURRENT_USER_ID, // allowDelete
+      LevelService.getInstance().getUserProfile()?.id === levelData.authorId, // allowDelete
       authorLevelCount
     );
     this.addChild(this.userProfileCard);

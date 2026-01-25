@@ -1,13 +1,48 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { auth } from './auth';
+
+
 
 const app = new Hono<{ Bindings: Env }>();
 
 // Enable CORS
-app.use('/*', cors());
+app.use('/*', cors({
+  origin: ['http://localhost:5173', 'https://opendots.pages.dev'],
+  allowHeaders: ['Content-Type', 'Authorization', 'x-user-id'],
+  allowMethods: ['POST', 'GET', 'OPTIONS', 'DELETE', 'PUT'],
+  exposeHeaders: ['Content-Length'],
+  maxAge: 600,
+  credentials: true,
+}));
 
 // Helper to get user ID from header
-const getUserId = (c: any) => c.req.header('x-user-id');
+
+// Helper to get user ID: Prefer Session Token (Bearer), fall back to x-user-id for now (dev) but warn
+// Helper to get user ID: Prefer valid session from better-auth
+const getUserId = async (c: any): Promise<string | null> => {
+  const session = await auth(c.env).api.getSession({
+    headers: c.req.raw.headers,
+  });
+
+  if (session) {
+    return session.user.id;
+  }
+
+  // Fallback for public browsing or legacy dev (if needed, but better-auth is preferred)
+  return null;
+};
+
+
+// ==================== Auth ====================
+
+// ==================== Auth ====================
+
+app.on(['POST', 'GET'], '/api/auth/*', (c) => {
+  return auth(c.env).handler(c.req.raw);
+});
+
+
 
 // ==================== Levels ====================
 
@@ -51,7 +86,7 @@ app.get('/levels/:id', async (c) => {
 app.post('/levels/:id/publish', async (c) => {
   const id = c.req.param('id');
   const body = await c.req.json();
-  const userId = getUserId(c) || body.authorId;
+  const userId = await getUserId(c);
 
   if (!userId) {
     return c.json({ error: 'Unauthorized: Missing User ID' }, 401);
@@ -100,7 +135,7 @@ app.delete('/levels/:id', async (c) => {
 // Like level
 app.post('/levels/:id/like', async (c) => {
   const levelId = c.req.param('id');
-  const userId = getUserId(c);
+  const userId = await getUserId(c);
 
   if (!userId) return c.json({ error: 'User ID required' }, 401);
 
@@ -157,44 +192,35 @@ app.post('/levels/:id/clear', async (c) => {
 
 // Get Current User (Me)
 app.get('/users/me', async (c) => {
-  const userId = getUserId(c);
+  const userId = await getUserId(c);
   if (!userId) return c.json({ error: 'User ID required' }, 401);
 
-  const user = await c.env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
+  const user = await c.env.DB.prepare('SELECT * FROM user WHERE id = ?').bind(userId).first();
   if (!user) return c.json({ error: 'User not found' }, 404);
 
   return c.json({
     id: user.id,
     name: user.name,
-    avatarColor: user.avatar_color,
-    avatarUrl: user.avatar_url,
-    githubUsername: user.github_username,
+    avatarColor: 0x4ECDC4, // Legacy fallback
+    avatarUrl: user.image,
+    githubUsername: null, // Removed from new schema for now unless we add it to user table via additional fields
   });
 });
 
 // Update Current User
 app.put('/users/me', async (c) => {
   const body = await c.req.json();
-  const userId = getUserId(c) || body.id; // Allow ID in body for initial sync
+  const userId = await getUserId(c);
 
   if (!userId) return c.json({ error: 'User ID required' }, 401);
 
   await c.env.DB.prepare(`
-    INSERT INTO users (id, name, avatar_color, avatar_url, github_username, last_seen)
-    VALUES (?, ?, ?, ?, ?, ?)
-    ON CONFLICT(id) DO UPDATE SET
-      name = excluded.name,
-      avatar_color = excluded.avatar_color,
-      avatar_url = excluded.avatar_url,
-      github_username = excluded.github_username,
-      last_seen = excluded.last_seen
+    UPDATE user SET name = ?, image = ?, updatedAt = ? WHERE id = ?
   `).bind(
-    userId,
     body.name,
-    body.avatarColor,
     body.avatarUrl,
-    body.githubUsername,
-    Date.now()
+    Date.now(),
+    userId
   ).run();
 
   return c.json(body);
@@ -203,16 +229,16 @@ app.put('/users/me', async (c) => {
 // Get User by ID
 app.get('/users/:id', async (c) => {
   const id = c.req.param('id');
-  const user = await c.env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(id).first();
+  const user = await c.env.DB.prepare('SELECT * FROM user WHERE id = ?').bind(id).first();
 
   if (!user) return c.json(null); // Return null as expected by client
 
   return c.json({
     id: user.id,
     name: user.name,
-    avatarColor: user.avatar_color,
-    avatarUrl: user.avatar_url,
-    githubUsername: user.github_username,
+    avatarColor: 0x4ECDC4,
+    avatarUrl: user.image,
+    githubUsername: null,
   });
 });
 

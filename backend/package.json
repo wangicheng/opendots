@@ -9,10 +9,12 @@
     "db:init": "wrangler d1 execute opendots-db --local --file=./src/schema.sql"
   },
   "dependencies": {
+    "better-auth": "^1.4.17",
+    "drizzle-orm": "^0.45.1",
     "hono": "^4.6.19"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250124.0",
-    "wrangler": "^3.105.1"
+    "wrangler": "^4.60.0"
   }
 }

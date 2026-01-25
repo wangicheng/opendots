@@ -3,10 +3,14 @@ import type { IApiClient } from './api/IApiClient';
 import { RestApiClient } from './api/RestApiClient';
 import { MockApiClient } from './api/MockApiClient';
 
-export const CURRENT_USER_ID = localStorage.getItem('opendots_user_id') || 'user_me';
+import { authClient, signInWithGoogle, signOut } from './auth-client';
+
+export const CURRENT_USER_ID = localStorage.getItem('opendots_user_id') || 'guest';
+// STORAGE KEYS for legacy or caching - better-auth handles token storage (cookies usually or local)
+// We will still cache profile for immediate display if needed, but better-auth has its own session management.
 const STORAGE_KEY_DRAFTS = 'opendots_draft_levels';
-const STORAGE_KEY_PROFILE = 'opendots_user_profile';
 const STORAGE_KEY_LIKES = 'opendots_user_likes';
+
 
 // Set to true to use MockApiClient (localStorage), false for RestApiClient (real backend)
 const USE_MOCK_API = import.meta.env.VITE_USE_MOCK_API === 'true';
@@ -23,8 +27,10 @@ export class LevelService {
   private static instance: LevelService;
   private api: IApiClient;
   private drafts: LevelData[] = [];
-  private profile!: UserProfile;
+  private profile: UserProfile | null = null;
   private likedLevelIds: Set<string> = new Set();
+
+  private _isLoggedIn: boolean = false;
 
   // Cache for remote levels to avoid excessive fetching
   private remoteLevelsCache: LevelData[] | null = null;
@@ -35,9 +41,38 @@ export class LevelService {
     // Initialize API client based on environment
     this.api = USE_MOCK_API ? new MockApiClient() : new RestApiClient();
 
+    this.api = USE_MOCK_API ? new MockApiClient() : new RestApiClient();
+
+    this.checkLoginStatus();
     this.loadDrafts();
-    this.loadProfile();
     this.loadLikes();
+  }
+
+  private async checkLoginStatus(): Promise<void> {
+    try {
+      const { data: session } = await authClient.getSession();
+
+      if (session) {
+        this._isLoggedIn = true;
+        this.profile = {
+          id: session.user.id,
+          name: session.user.name,
+          avatarColor: 0x4ECDC4, // Fallback
+          avatarUrl: session.user.image || undefined,
+          // email: session.user.email // if we want to store it
+        };
+        // Legacy ID support
+        localStorage.setItem('opendots_user_id', session.user.id);
+      } else {
+        this._isLoggedIn = false;
+        this.profile = null;
+        localStorage.removeItem('opendots_user_id');
+      }
+    } catch (e) {
+      console.warn('Failed to check session', e);
+      this._isLoggedIn = false;
+      this.profile = null;
+    }
   }
 
   public static getInstance(): LevelService {
@@ -68,25 +103,9 @@ export class LevelService {
     localStorage.setItem(STORAGE_KEY_DRAFTS, JSON.stringify(this.drafts));
   }
 
+  // Deprecated loadProfile in favor of checkLoginStatus which handles sync
   private loadProfile(): void {
-    try {
-      const item = localStorage.getItem(STORAGE_KEY_PROFILE);
-      if (item) {
-        this.profile = JSON.parse(item);
-      } else {
-        this.profile = {
-          id: CURRENT_USER_ID,
-          name: 'Player',
-          avatarColor: 0x4ECDC4
-        };
-      }
-    } catch (e) {
-      this.profile = {
-        id: CURRENT_USER_ID,
-        name: 'Player',
-        avatarColor: 0x4ECDC4
-      };
-    }
+    // No-op
   }
 
   private loadLikes(): void {
@@ -156,6 +175,11 @@ export class LevelService {
   }
 
   public async saveLocalDraft(level: LevelData): Promise<void> {
+    if (!this._isLoggedIn && !USE_MOCK_API) {
+      // In real backend mode, require login to save work reliably? 
+      // Or allow local drafts for guests. Let's allow local drafts for guests.
+      // But they can't publish.
+    }
     const index = this.drafts.findIndex(l => l.id === level.id);
     if (index >= 0) {
       this.drafts[index] = level;
@@ -163,6 +187,28 @@ export class LevelService {
       this.drafts.push(level);
     }
     this.saveDrafts();
+  }
+
+  public async loginWithGoogle(credential: string): Promise<void> {
+    // Credential arg is legacy from previous Google flow.
+    // better-auth handles flow. We just trigger it.
+    try {
+      await signInWithGoogle();
+      // Redirect handled by callbackURL
+    } catch (e) {
+      console.error('Login failed', e);
+      throw e;
+    }
+  }
+
+  public async logout(): Promise<void> {
+    await signOut();
+    // API client logout is handled by better-auth
+    // window.location.reload() called in signOut helper
+  }
+
+  public isLoggedIn(): boolean {
+    return this._isLoggedIn;
   }
 
   public async publishLevel(levelId: string): Promise<void> {
@@ -248,16 +294,16 @@ export class LevelService {
 
   // ==================== User Profile ====================
 
-  public getUserProfile(): UserProfile {
+  public getUserProfile(): UserProfile | null {
     return this.profile;
   }
 
-  public updateUserProfile(data: Partial<UserProfile>): UserProfile {
+  public updateUserProfile(data: Partial<UserProfile>): UserProfile | null {
+    if (!this.profile) return null;
     this.profile = { ...this.profile, ...data };
-    localStorage.setItem(STORAGE_KEY_PROFILE, JSON.stringify(this.profile));
 
     // Sync with backend
-    this.api.updateCurrentUser(this.profile).catch(e => {
+    this.api.updateCurrentUser(data).catch(e => {
       console.warn('Failed to sync profile', e);
     });
 

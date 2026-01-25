@@ -59,6 +59,16 @@ export interface IApiClient {
   updateCurrentUser(data: Partial<UserProfile>): Promise<UserProfile>;
 
   /**
+   * Login with Google Credential.
+   */
+  loginWithGoogle(token: string): Promise<{ token: string; user: UserProfile }>;
+
+  /**
+   * Logout the current user.
+   */
+  logout(): Promise<void>;
+
+  /**
    * Get another user's public profile.
    */
   getUser(userId: string): Promise<UserProfile | null>;
