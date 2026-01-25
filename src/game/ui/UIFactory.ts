@@ -80,16 +80,15 @@ export class UIFactory {
 
     // 2. Load Image if URL exists
     if (url) {
-      // We use a unique load ID or just let PIXI handle cache? 
-      // PIXI handles cache. We just need to handle component destruction which is hard here without context.
-      // However, usually it's fine if we add child to a destroyed container, it just won't render.
-      // But we should check if destroyed to avoid errors.
-
-      PIXI.Assets.load(url).then((texture) => {
+      // Use Assets.load with async loading - handles extensionless URLs via browser fetch
+      PIXI.Assets.load({
+        src: url,
+        parser: 'loadTextures',
+      }).then((texture) => {
         if (container.destroyed) return;
 
         if (!texture) {
-          console.warn('UIFactory: Avatar texture loaded is null', url);
+          console.warn('UIFactory: Avatar texture loaded is null/undefined', url);
           return;
         }
 
@@ -120,10 +119,8 @@ export class UIFactory {
         border.circle(0, 0, radius);
         border.stroke({ width: scale(4), color: strokeColor });
         container.addChild(border);
-
-        // Hide background? No, keep it behind just in case of transparency or loading delay (already covered).
       }).catch((err) => {
-        console.error('UIFactory: Failed to load avatar', err);
+        console.warn('UIFactory: Failed to load avatar', url, err);
       });
     } else {
       // If no URL, draw border on the fallback

@@ -41,6 +41,7 @@ export class RestApiClient implements IApiClient {
     const response = await fetch(url, {
       ...options,
       headers,
+      credentials: 'include',
     });
 
     if (!response.ok) {
