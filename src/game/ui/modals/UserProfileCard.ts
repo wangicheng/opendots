@@ -195,8 +195,10 @@ export class UserProfileCard extends PIXI.Container {
     let profileUrl: string | undefined;
     if (this.levelData.authorId === CURRENT_USER_ID) {
       const profile = LevelService.getInstance().getUserProfile();
-      profileColor = profile.avatarColor;
-      profileUrl = profile.avatarUrl;
+      if (profile) {
+        profileColor = profile.avatarColor;
+        profileUrl = profile.avatarUrl;
+      }
     }
 
     const avatar = UIFactory.createAvatar(avatarRadius, profileUrl, profileColor);

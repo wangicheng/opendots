@@ -223,7 +223,7 @@ export class MockApiClient implements IApiClient {
 
   // ==================== Auth ====================
 
-  async loginWithGoogle(token: string): Promise<{ token: string; user: UserProfile }> {
+  async loginWithGoogle(_token: string): Promise<{ token: string; user: UserProfile }> {
     await this.delay();
     // Simulate lookup or create
     return {

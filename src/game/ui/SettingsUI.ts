@@ -7,9 +7,7 @@ import { UIFactory } from './UIFactory';
 import { LanguageManager, type TranslationKey } from '../i18n/LanguageManager';
 
 // Constants
-const MAX_NAME_LENGTH = 16;
-const MAX_AVATAR_SIZE = 256;
-const MAX_AVATAR_BYTES = 10240;
+
 
 // Type for list item with named children
 interface ListItemResult {
@@ -27,7 +25,7 @@ export class SettingsUI extends PIXI.Container {
   private currentView: SettingsView = 'list';
   private overlay: PIXI.Graphics;
   private card: PIXI.Container;
-  private fileInputElement: HTMLInputElement | null = null;
+
 
   constructor(onClose: () => void) {
     super();
@@ -427,108 +425,14 @@ export class SettingsUI extends PIXI.Container {
 
 
 
-  private triggerFileUpload(): void {
-    if (this.fileInputElement) {
-      this.removeFileInput();
-    }
 
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.style.display = 'none';
-    document.body.appendChild(input);
-
-    input.addEventListener('change', (e: Event) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (readerEvent) => {
-          const result = readerEvent.target?.result as string;
-          if (result) {
-            // Process Image: Resize and Compress
-            const img = new Image();
-            img.onerror = () => {
-              console.error('Failed to load uploaded image');
-            };
-            img.onload = () => {
-              let w = img.width;
-              let h = img.height;
-
-              // Resize logic
-              if (w > MAX_AVATAR_SIZE || h > MAX_AVATAR_SIZE) {
-                if (w > h) {
-                  h = Math.round(h * (MAX_AVATAR_SIZE / w));
-                  w = MAX_AVATAR_SIZE;
-                } else {
-                  w = Math.round(w * (MAX_AVATAR_SIZE / h));
-                  h = MAX_AVATAR_SIZE;
-                }
-              }
-
-              const canvas = document.createElement('canvas');
-              canvas.width = w;
-              canvas.height = h;
-              const ctx = canvas.getContext('2d');
-              if (ctx) {
-                ctx.drawImage(img, 0, 0, w, h);
-
-                // Compress to JPEG using binary search (3 iterations)
-                let minQ = 0.0;
-                let maxQ = 1.0;
-                let bestUrl = canvas.toDataURL('image/jpeg', 0.1); // Fallback
-
-                for (let i = 0; i < 3; i++) {
-                  const midQ = (minQ + maxQ) / 2;
-                  const url = canvas.toDataURL('image/jpeg', midQ);
-                  // More accurate byte calculation
-                  const base64Data = url.split(',')[1] || '';
-                  const bytes = base64Data.length * 0.75;
-
-                  if (bytes <= MAX_AVATAR_BYTES) {
-                    bestUrl = url;
-                    minQ = midQ;
-                  } else {
-                    maxQ = midQ;
-                  }
-                }
-
-                LevelService.getInstance().updateUserProfile({ avatarUrl: bestUrl });
-                this.refreshUI();
-                this.emit('profileUpdate');
-              }
-            };
-            img.src = result;
-          }
-        };
-        reader.readAsDataURL(file);
-      }
-      this.removeFileInput();
-    });
-
-    // Cancel/Cleanup
-    // Note: 'cancel' event support is limited, but we can try to detect focus return or just leave it attached until next open
-    // Ideally we remove it after some timeout or on blur, but file inputs are tricky. 
-    // We will just remove it after selection or explicitly when re-triggered.
-
-    input.click();
-    this.fileInputElement = input;
-  }
-
-  private removeFileInput(): void {
-    if (this.fileInputElement) {
-      if (this.fileInputElement.parentNode) {
-        this.fileInputElement.parentNode.removeChild(this.fileInputElement);
-      }
-      this.fileInputElement = null;
-    }
-  }
 
 
 
   public destroy(options?: any): void {
     window.removeEventListener('resize', this.handleResize);
     LanguageManager.getInstance().unsubscribe(this.handleLanguageChange);
-    this.removeFileInput();
+
     // this.removeGoogleButton();
     super.destroy(options);
   }

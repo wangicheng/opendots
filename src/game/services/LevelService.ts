@@ -103,10 +103,7 @@ export class LevelService {
     localStorage.setItem(STORAGE_KEY_DRAFTS, JSON.stringify(this.drafts));
   }
 
-  // Deprecated loadProfile in favor of checkLoginStatus which handles sync
-  private loadProfile(): void {
-    // No-op
-  }
+
 
   private loadLikes(): void {
     try {
@@ -189,7 +186,7 @@ export class LevelService {
     this.saveDrafts();
   }
 
-  public async loginWithGoogle(credential: string): Promise<void> {
+  public async loginWithGoogle(_credential: string): Promise<void> {
     // Credential arg is legacy from previous Google flow.
     // better-auth handles flow. We just trigger it.
     try {
