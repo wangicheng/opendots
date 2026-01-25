@@ -88,6 +88,11 @@ export class UIFactory {
       PIXI.Assets.load(url).then((texture) => {
         if (container.destroyed) return;
 
+        if (!texture) {
+          console.warn('UIFactory: Avatar texture loaded is null', url);
+          return;
+        }
+
         const sprite = new PIXI.Sprite(texture);
 
         // Aspect Fit/Cover Logic (Cover)
