@@ -24,7 +24,7 @@ import { UIFactory } from './ui/UIFactory';
 import { type Pen, DEFAULT_PEN } from './data/PenData';
 import { DrawingManager } from './input/DrawingManager';
 import { LevelManager } from './levels/LevelManager';
-import { MockLevelService, CURRENT_USER_ID } from './services/MockLevelService';
+import { LevelService, CURRENT_USER_ID } from './services/LevelService';
 import type { LevelData } from './levels/LevelSchema';
 import type { Point } from './utils/douglasPeucker';
 import {
@@ -714,7 +714,7 @@ export class Game {
           this.closeConfirmDialog();
           // Auto-save current design first, especially if they just passed
           await this.saveLevel();
-          await MockLevelService.getInstance().publishLevel(currentLevel.id);
+          await LevelService.getInstance().publishLevel(currentLevel.id);
           currentLevel.isPublished = true;
 
           this.showConfirmDialog(
@@ -1296,7 +1296,7 @@ export class Game {
     const { LevelSelectionUI } = await import('./ui/LevelSelectionUI');
 
     // Fetch all levels (built-in + user uploaded) from Service
-    const levelService = MockLevelService.getInstance();
+    const levelService = LevelService.getInstance();
     const levels = await levelService.getLevelList();
 
     this.levelSelectionUI = new LevelSelectionUI(levels, (levelData) => {
@@ -1341,7 +1341,7 @@ export class Game {
       this.levelSelectionUI.setPen(this.currentPen.id);
 
       // Refresh Levels
-      const levelService = MockLevelService.getInstance();
+      const levelService = LevelService.getInstance();
       const levels = await levelService.getLevelList();
       this.levelSelectionUI.updateLevels(levels);
     }
@@ -1620,7 +1620,7 @@ export class Game {
     };
 
     console.log('Creating new level:', newLevel);
-    await MockLevelService.getInstance().uploadLevel(newLevel);
+    await LevelService.getInstance().saveLocalDraft(newLevel);
 
     // Start in Edit mode (currently just Play mode as placeholder until EditorUI is ready)
     // await this.startLevel(newLevel); // Original line
@@ -2352,7 +2352,7 @@ export class Game {
 
   private async saveLevel() {
     if (this.editingLevel) {
-      await MockLevelService.getInstance().uploadLevel(this.editingLevel);
+      await LevelService.getInstance().saveLocalDraft(this.editingLevel);
       this.editorHasChanged = false;
       console.log("Level Saved.");
     }

@@ -15,7 +15,7 @@ import { PenSelectionUI } from './PenSelectionUI';
 import { SettingsUI } from './SettingsUI';
 import { type Pen } from '../data/PenData';
 import { UserProfileCard } from './modals/UserProfileCard';
-import { CURRENT_USER_ID, MockLevelService } from '../services/MockLevelService';
+import { CURRENT_USER_ID, LevelService } from '../services/LevelService';
 import { UIFactory } from './UIFactory';
 import { LanguageManager, type TranslationKey } from '../i18n/LanguageManager';
 
@@ -500,7 +500,7 @@ export class LevelSelectionUI extends PIXI.Container {
     // Check if it's CURRENT USER and use their profile
     let profileUrl: string | undefined;
     if (levelData.authorId === CURRENT_USER_ID) {
-      const profile = MockLevelService.getInstance().getUserProfile();
+      const profile = LevelService.getInstance().getUserProfile();
       color = profile.avatarColor; // Override color
       profileUrl = profile.avatarUrl;
     }
@@ -733,7 +733,7 @@ export class LevelSelectionUI extends PIXI.Container {
 
     // Listen for profile updates to refresh the background immediately
     this.settingsUI.on('profileUpdate', () => {
-      MockLevelService.getInstance().getLevelList().then(levels => {
+      LevelService.getInstance().getLevelList().then(levels => {
         this.levels = levels;
         this.refreshVisibleLevels();
       });
@@ -749,7 +749,7 @@ export class LevelSelectionUI extends PIXI.Container {
       this.settingsUI = null;
 
       // Refresh to update avatar and name
-      MockLevelService.getInstance().getLevelList().then(levels => {
+      LevelService.getInstance().getLevelList().then(levels => {
         this.levels = levels;
         this.refreshVisibleLevels();
       });
@@ -763,6 +763,11 @@ export class LevelSelectionUI extends PIXI.Container {
       this.userProfileCard = null;
     }
 
+    // Count levels by this author
+    const authorLevelCount = this.levels.filter(
+      l => l.authorId === levelData.authorId && l.isPublished
+    ).length;
+
     this.userProfileCard = new UserProfileCard(levelData, color,
       (w, h) => this.createLevelThumbnail(levelData, w, h),
       () => this.closeUserProfile(),
@@ -771,17 +776,18 @@ export class LevelSelectionUI extends PIXI.Container {
         this.setFilterAuthor(id, levelData.author || '', color);
       },
       () => {
-        MockLevelService.getInstance().toggleLike(levelData.id);
+        LevelService.getInstance().toggleLike(levelData.id);
         this.setupGrid();
       },
       (levelId) => {
-        MockLevelService.getInstance().deleteLevel(levelId);
+        LevelService.getInstance().deleteLevel(levelId);
         this.closeUserProfile();
         // Remove locally to update UI immediately without re-fetching
         this.levels = this.levels.filter(l => l.id !== levelId);
         this.refreshVisibleLevels();
       },
-      this.filterAuthorId === CURRENT_USER_ID // allowDelete
+      this.filterAuthorId === CURRENT_USER_ID, // allowDelete
+      authorLevelCount
     );
     this.addChild(this.userProfileCard);
   }

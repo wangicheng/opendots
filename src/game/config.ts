@@ -222,3 +222,7 @@ export const Z_INDEX = {
   UI_OVERLAY: 1000,
   DRAG_PREVIEW: 2000,
 };
+
+// API Configuration
+export const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+export const GITHUB_API_URL = 'https://api.github.com';

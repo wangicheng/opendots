@@ -1,7 +1,7 @@
 
 import * as PIXI from 'pixi.js';
 import { getCanvasWidth, getCanvasHeight, scale } from '../config';
-import { MockLevelService } from '../services/MockLevelService';
+import { LevelService } from '../services/LevelService';
 import { UIFactory } from './UIFactory';
 
 import { LanguageManager, type TranslationKey } from '../i18n/LanguageManager';
@@ -130,7 +130,7 @@ export class SettingsUI extends PIXI.Container {
     // Header
     this.drawHeader(width, { title: t('profile.title'), showBack: true, onBack: () => this.setView('list') });
 
-    const profile = MockLevelService.getInstance().getUserProfile();
+    const profile = LevelService.getInstance().getUserProfile();
     const centerX = width / 2;
 
     // Avatar Section
@@ -203,7 +203,7 @@ export class SettingsUI extends PIXI.Container {
           if (trimmed.length > MAX_NAME_LENGTH) {
             trimmed = trimmed.substring(0, MAX_NAME_LENGTH);
           }
-          MockLevelService.getInstance().updateUserProfile({ name: trimmed });
+          LevelService.getInstance().updateUserProfile({ name: trimmed });
           this.refreshUI();
           this.emit('profileUpdate');
         }
@@ -465,7 +465,7 @@ export class SettingsUI extends PIXI.Container {
                   }
                 }
 
-                MockLevelService.getInstance().updateUserProfile({ avatarUrl: bestUrl });
+                LevelService.getInstance().updateUserProfile({ avatarUrl: bestUrl });
                 this.refreshUI();
                 this.emit('profileUpdate');
               }

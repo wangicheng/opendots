@@ -2,7 +2,7 @@
 import * as PIXI from 'pixi.js';
 import { getCanvasWidth, getCanvasHeight, scale } from '../../config';
 import type { LevelData } from '../../levels/LevelSchema';
-import { CURRENT_USER_ID, MockLevelService } from '../../services/MockLevelService';
+import { CURRENT_USER_ID, LevelService } from '../../services/LevelService';
 import { ConfirmDialog } from './ConfirmDialog';
 import { UIFactory } from '../UIFactory';
 import { LanguageManager, type TranslationKey } from '../../i18n/LanguageManager';
@@ -16,6 +16,7 @@ export class UserProfileCard extends PIXI.Container {
   private levelData: LevelData;
   private userColor: number;
   private getThumbnail: (width: number, height: number) => PIXI.Container;
+  private authorLevelCount: number;
 
   constructor(
     levelData: LevelData,
@@ -25,7 +26,8 @@ export class UserProfileCard extends PIXI.Container {
     onViewLevels: (userId: string) => void,
     onLikeToggle?: () => void,
     onDelete?: (levelId: string) => void,
-    allowDelete: boolean = false
+    allowDelete: boolean = false,
+    authorLevelCount: number = 0
   ) {
     super();
     this.levelData = levelData;
@@ -36,6 +38,7 @@ export class UserProfileCard extends PIXI.Container {
     this.onLikeToggleCallback = onLikeToggle;
     this.onDeleteCallback = onDelete;
     this.allowDelete = allowDelete;
+    this.authorLevelCount = authorLevelCount;
 
     this.refreshUI();
 
@@ -191,7 +194,7 @@ export class UserProfileCard extends PIXI.Container {
     let profileColor = this.userColor;
     let profileUrl: string | undefined;
     if (this.levelData.authorId === CURRENT_USER_ID) {
-      const profile = MockLevelService.getInstance().getUserProfile();
+      const profile = LevelService.getInstance().getUserProfile();
       profileColor = profile.avatarColor;
       profileUrl = profile.avatarUrl;
     }
@@ -216,7 +219,7 @@ export class UserProfileCard extends PIXI.Container {
 
     // User Stats (Total Levels)
     const statsText = new PIXI.Text({
-      text: t('profile.total_levels') + '42',
+      text: t('profile.total_levels') + this.authorLevelCount.toString(),
       style: { fontFamily: 'Arial', fontSize: scale(14), fill: '#AAAAAA', align: 'center' }
     });
     statsText.anchor.set(0.5, 0);
