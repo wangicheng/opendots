@@ -157,6 +157,9 @@ export class Game {
     await PIXI.Assets.load(import.meta.env.BASE_URL + 'gear.svg');
     this.laserTexture = await PIXI.Assets.load(import.meta.env.BASE_URL + 'laser.svg');
 
+    // Preload icons font to prevent rendering issues
+    await document.fonts.load('10pt "bootstrap-icons"');
+
     console.log('Pixi initialized, adding canvas...');
     // Add canvas to DOM
     const container = document.getElementById('app');
