@@ -103,7 +103,18 @@ export class LevelSelectionUI extends PIXI.Container {
       this.setupHeader();
       this.setupGrid();
     });
+
+    // Listen for Profile/Auth changes
+    LevelService.getInstance().subscribe(this.handleProfileUpdate);
   }
+
+  private handleProfileUpdate = (): void => {
+    // 1. Update Header (Mine button, Create Level button)
+    this.updateSortButtons();
+
+    // 2. Refresh Levels (re-render cards with avatars)
+    this.refreshVisibleLevels();
+  };
 
   private setupHeader(): void {
     const t = (key: TranslationKey) => LanguageManager.getInstance().t(key);
@@ -741,14 +752,6 @@ export class LevelSelectionUI extends PIXI.Container {
     this.settingsUI = new SettingsUI(() => this.closeSettings());
     this.settingsUI.zIndex = 2000;
 
-    // Listen for profile updates to refresh the background immediately
-    this.settingsUI.on('profileUpdate', () => {
-      LevelService.getInstance().getLevelList().then(levels => {
-        this.levels = levels;
-        this.refreshVisibleLevels();
-      });
-    });
-
     this.addChild(this.settingsUI);
   }
 
@@ -1085,5 +1088,10 @@ export class LevelSelectionUI extends PIXI.Container {
   public updateLevels(levels: LevelData[]): void {
     this.levels = levels;
     this.refreshVisibleLevels();
+  }
+
+  destroy(options?: any): void {
+    LevelService.getInstance().unsubscribe(this.handleProfileUpdate);
+    super.destroy(options);
   }
 }

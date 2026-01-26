@@ -68,10 +68,12 @@ export class LevelService {
         this.profile = null;
         localStorage.removeItem('opendots_user_id');
       }
+      this.notifyListeners();
     } catch (e) {
       console.warn('Failed to check session', e);
       this._isLoggedIn = false;
       this.profile = null;
+      this.notifyListeners();
     }
   }
 
@@ -200,6 +202,9 @@ export class LevelService {
 
   public async logout(): Promise<void> {
     await signOut();
+    this._isLoggedIn = false; // Optimistic update
+    this.profile = null;
+    this.notifyListeners();
     // API client logout is handled by better-auth
     // window.location.reload() called in signOut helper
   }
@@ -299,6 +304,8 @@ export class LevelService {
     if (!this.profile) return null;
     this.profile = { ...this.profile, ...data };
 
+    this.notifyListeners();
+
     // Sync with backend
     this.api.updateCurrentUser(data).catch(e => {
       console.warn('Failed to sync profile', e);
@@ -323,5 +330,20 @@ export class LevelService {
     } catch (e) {
       console.warn('Failed to record clear', e);
     }
+  }
+
+  // ==================== Events ====================
+  private listeners: (() => void)[] = [];
+
+  public subscribe(callback: () => void): void {
+    this.listeners.push(callback);
+  }
+
+  public unsubscribe(callback: () => void): void {
+    this.listeners = this.listeners.filter(l => l !== callback);
+  }
+
+  private notifyListeners(): void {
+    this.listeners.forEach(l => l());
   }
 }

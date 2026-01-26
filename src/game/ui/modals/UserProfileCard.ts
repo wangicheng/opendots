@@ -2,7 +2,7 @@
 import * as PIXI from 'pixi.js';
 import { getCanvasWidth, getCanvasHeight, scale } from '../../config';
 import type { LevelData } from '../../levels/LevelSchema';
-import { CURRENT_USER_ID, LevelService } from '../../services/LevelService';
+import { LevelService } from '../../services/LevelService';
 import { ConfirmDialog } from './ConfirmDialog';
 import { UIFactory } from '../UIFactory';
 import { LanguageManager, type TranslationKey } from '../../i18n/LanguageManager';
@@ -44,7 +44,14 @@ export class UserProfileCard extends PIXI.Container {
 
     // Listen for resize
     window.addEventListener('resize', this.handleResize);
+
+    // Listen for profile updates
+    LevelService.getInstance().subscribe(this.handleProfileUpdate);
   }
+
+  private handleProfileUpdate = (): void => {
+    this.refreshUI();
+  };
 
   private handleResize = (): void => {
     this.refreshUI();
@@ -193,7 +200,11 @@ export class UserProfileCard extends PIXI.Container {
 
     let profileColor = this.userColor;
     let profileUrl: string | undefined;
-    if (this.levelData.authorId === CURRENT_USER_ID) {
+
+    // Check dynamic ID
+    const currentUserId = LevelService.getInstance().getUserProfile()?.id;
+
+    if (currentUserId && this.levelData.authorId === currentUserId) {
       const profile = LevelService.getInstance().getUserProfile();
       if (profile) {
         profileColor = profile.avatarColor;
@@ -229,7 +240,12 @@ export class UserProfileCard extends PIXI.Container {
     rightCol.addChild(statsText);
 
     // View Levels / Delete Button
-    const actionBtn = (this.levelData.authorId === CURRENT_USER_ID && this.allowDelete)
+    // Check dynamic ID again
+    // View Levels / Delete Button
+    // reuse currentUserId from above
+    const isLocalAuthor = currentUserId && this.levelData.authorId === currentUserId;
+
+    const actionBtn = (isLocalAuthor && this.allowDelete)
       ? this.createDeleteButton(subCardWidth - scale(40))
       : this.createViewLevelsButton(subCardWidth - scale(40));
 
@@ -414,6 +430,7 @@ export class UserProfileCard extends PIXI.Container {
 
   destroy(options?: any): void {
     window.removeEventListener('resize', this.handleResize);
+    LevelService.getInstance().unsubscribe(this.handleProfileUpdate);
     super.destroy(options);
   }
 }

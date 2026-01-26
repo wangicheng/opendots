@@ -44,7 +44,14 @@ export class SettingsUI extends PIXI.Container {
 
     // Language listener
     LanguageManager.getInstance().subscribe(this.handleLanguageChange);
+
+    // LevelService listener (Profile/Auth updates)
+    LevelService.getInstance().subscribe(this.handleServiceUpdate);
   }
+
+  private handleServiceUpdate = (): void => {
+    this.refreshUI();
+  };
 
   private handleLanguageChange = (): void => {
     this.refreshUI();
@@ -434,6 +441,7 @@ export class SettingsUI extends PIXI.Container {
     LanguageManager.getInstance().unsubscribe(this.handleLanguageChange);
 
     // this.removeGoogleButton();
+    LevelService.getInstance().unsubscribe(this.handleServiceUpdate);
     super.destroy(options);
   }
 }
